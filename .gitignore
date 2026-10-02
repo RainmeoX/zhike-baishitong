@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 数据与产物（爬取内容不入库）
+data/
+*.db
+*.sqlite
+
+# IDE / 系统
+.vscode/
+*.code-workspace
+Thumbs.db
+.DS_Store
+
+# 密钥与本地配置
+.env
+config.local.*
