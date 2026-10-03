@@ -4,9 +4,10 @@
 语义路未配置（无 embedding key）时自动退化为纯关键词路。
 重建向量库：python -m retrieval.hybrid --rebuild
 """
-import json
+import datetime, json
 
 from retrieval import vector
+from retrieval.rerank import rerank
 from retrieval.search import search as keyword_search
 from retrieval.db import get_conn
 
@@ -49,8 +50,10 @@ def hybrid_search(query, topk=5):
         except Exception:
             pass  # 语义路失败 → 关键词路兜底
 
+    fused = sorted(scores.items(), key=lambda x: -x[1])[:topk * 2]  # 候选池留给重排
+
     results = []
-    for did, s in sorted(scores.items(), key=lambda x: -x[1])[:topk]:
+    for did, s in fused:
         d = kw_by_id.get(did) or _doc_by_id(did)
         if d is None:
             continue
@@ -58,6 +61,30 @@ def hybrid_search(query, topk=5):
         d["score"] = round(s * 1000)
         d["routes"] = "".join(sorted(routes.get(did, [])))  # kw=关键词命中 sem=语义命中
         results.append(d)
+
+    # 重排精排（bge-reranker）：query vs 标题+正文，失败自动保持 RRF 序
+    conn = get_conn()
+    def _text_of(d):
+        row = conn.execute("SELECT content FROM documents WHERE doc_id=?",
+                           (str(d["doc_id"]),)).fetchone()
+        text = d["title"] + chr(10) + ((row["content"] or "")[:800] if row else "")
+        return text
+    results = rerank(query, results, _text_of, topk=topk)
+    conn.close()
+
+    # 时效降权：重排相关性 × 年份权重（当年 1.0 / 去年 0.75 / 更早 0.5）
+    year = datetime.date.today().year
+    def _recency(d):
+        try:
+            y = int(str(d.get("publish_time", ""))[:4])
+        except (ValueError, TypeError):
+            return 0.75
+        if y >= year: return 1.0
+        if y == year - 1: return 0.75
+        return 0.5
+    for d in results:
+        d["final_score"] = round(d.get("rerank_score", d.get("score", 0) / 1000) * _recency(d), 4)
+    results.sort(key=lambda d: -d["final_score"])
     return results
 
 def routes_of(result):
