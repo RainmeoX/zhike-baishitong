@@ -1,0 +1,49 @@
+<!-- pages/index/index.wxml -->
+<view class="container">
+  <view class="search-bar">
+    <view class="search-box">
+      <icon type="search" size="18" color="#999" />
+      <input
+        class="search-input"
+        placeholder="搜索校务问题，如"报修电话""
+        value="{{inputValue}}"
+        bindinput="onInput"
+        confirm-type="search"
+        bindconfirm="onSearch"
+      />
+      <view wx:if="{{inputValue}}" class="clear-btn" bindtap="onInput">
+        <icon type="clear" size="16" color="#999" />
+      </view>
+    </view>
+    <view class="search-btn" bindtap="onSearch">搜索</view>
+  </view>
+
+  <view wx:if="{{history.length > 0}}" class="section">
+    <view class="section-header">
+      <text>最近搜索</text>
+      <text class="clear-link" bindtap="clearHistory">清除</text>
+    </view>
+    <view class="tags">
+      <view class="tag-item" wx:for="{{history}}" wx:key="*this" data-q="{{item}}" bindtap="onHistoryTap">
+        {{item}}
+      </view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-header">
+      <text>热门问题</text>
+    </view>
+    <view class="tags">
+      <view
+        class="tag-item"
+        wx:for="{{hotQuestions}}"
+        wx:key="*this"
+        data-q="{{item}}"
+        bindtap="onHotTap"
+      >
+        {{item}}
+      </view>
+    </view>
+  </view>
+</view>

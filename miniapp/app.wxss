@@ -1,0 +1,47 @@
+/* 珠科百事通 - 全局样式 */
+page {
+  background-color: #f5f7fa;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.container {
+  padding: 32rpx;
+}
+
+.primary-color {
+  color: #409eff;
+}
+
+.bg-primary {
+  background-color: #409eff;
+}
+
+.card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.06);
+}
+
+.title {
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-bottom: 16rpx;
+}
+
+.muted {
+  color: #999;
+  font-size: 26rpx;
+}
+
+.tag {
+  display: inline-block;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+  margin-right: 12rpx;
+  background: #e8f3ff;
+  color: #409eff;
+}

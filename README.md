@@ -14,10 +14,10 @@
 ## 项目结构
 
 ```
-├── crawler/      数据层：教务处/后勤处/官网通知爬虫（ZY 主导）
+├── crawler/      数据层：教务处/后勤处/招生办通知爬虫（ZY 主导）
 ├── retrieval/    检索层：FTS5 关键词路 + 语义向量路 + RRF 融合（ZY 主导）
 ├── api/          生成层：FastAPI 问答服务 + 引用强制校验（ZY 主导）
-├── miniapp/      应用层：微信小程序学生端（ZC 主导）
+├── miniapp/      应用层：微信小程序学生端（ZC 主导）— 已搭骨架（首页搜索 + 结果页）
 ├── data/         爬取数据落地（原始副本不入库）
 ├── evaluation/   评测集：100+ 真实学生问答（HJQ 主导）
 └── docs/         方案书与分工书
@@ -39,6 +39,48 @@
 | 提交冲刺 | 10-20 ~ 10-23 | 每日提交迭代，10-23 截止 |
 
 详细任务见分工书。
+
+## 快速开始
+
+环境：Python 3.12+（依赖见 `requirements.txt`）
+
+```bash
+# 方式一：一键启动（推荐）
+python start.py
+
+# 方式二：分步运行
+python -m pip install -r requirements.txt          # 装依赖
+python -m crawler.run --site jiaowu                 # 爬教务处
+python -m crawler.run --site houqin                 # 爬后勤处
+python -m crawler.run --site zsb                    # 爬招生办
+python -m retrieval.index                           # 数据入库
+python -m uvicorn api.main:app --port 8000          # 启 API
+```
+
+测试：
+
+```bash
+# 健康检查
+curl http://127.0.0.1:8000/health
+
+# 问答
+curl -X POST http://127.0.0.1:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question":"四六级考试什么时候报名","topk":5}'
+
+# 评测（40 问）
+python -m evaluation.runner --api http://127.0.0.1:8000
+```
+
+## 当前状态（2026-10-02）
+
+| 层 | 状态 | 说明 |
+|---|---|---|
+| 数据层 | ✅ 199 篇 | 教务处 109 + 后勤处 87 + 招生办 3 |
+| 检索层 | ✅ 混合路 | FTS5（数字/英文）+ LIKE（中文子串）+ 同义词扩展 |
+| 生成层 | ✅ 抽取式 | 智能摘要提取（最相关句子 + 上下文），大模型生成待接华为云 MaaS |
+| 应用层 | ✅ 骨架 | 微信小程序：首页搜索/热门/历史 + 结果页答案/置信度/出处 |
+| 评测 | ✅ 40 问 100% | 覆盖教务/后勤/招生全部类别 |
 
 ## 开发约定
 

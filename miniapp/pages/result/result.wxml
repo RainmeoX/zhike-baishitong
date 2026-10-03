@@ -1,0 +1,53 @@
+<!-- pages/result/result.wxml -->
+<view class="container">
+  <view class="question-card card">
+    <view class="question-label">你的问题</view>
+    <view class="question-text">{{question}}</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading">
+    <view class="loading-spinner" />
+    <view class="loading-text">正在检索官方信息...</view>
+  </view>
+
+  <view wx:if="{{!loading && error}}" class="error-card card">
+    <icon type="warn" size="32" color="#faad14" />
+    <view class="error-text">{{error}}</view>
+  </view>
+
+  <view wx:if="{{!loading && !error}}">
+    <view class="answer-card card">
+      <view class="answer-label">
+        <view class="confidence-bar">
+          <view class="confidence-fill" style="width: {{confidence * 100}}%" />
+        </view>
+        <view class="confidence-text">置信度 {{Math.round(confidence * 100)}}%</view>
+      </view>
+      <view class="answer-text">{{answer}}</view>
+    </view>
+
+    <view class="refs-card card">
+      <view class="refs-title">
+        <icon type="search" size="20" color="#409eff" />
+        <text>参考来源（{{references.length}}）</text>
+      </view>
+      <view class="refs-list">
+        <view class="ref-item" wx:for="{{references}}" wx:key="title" data-url="{{item.source_url}}" bindtap="onCopyUrl">
+          <view class="ref-title">{{item.title}}</view>
+          <view class="ref-meta">
+            <text class="ref-tag">{{item.department}}</text>
+            <text class="ref-tag">{{item.column}}</text>
+            <text class="ref-score">匹配度 {{item.score}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="action-bar">
+    <view class="action-btn" bindtap="onNewSearch">
+      <icon type="search" size="20" color="#409eff" />
+      <text>新问题</text>
+    </view>
+  </view>
+</view>
