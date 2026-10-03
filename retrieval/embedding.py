@@ -5,6 +5,9 @@
 """
 import os, json, urllib.request
 
+from retrieval.maas_env import load
+load()
+
 _API_KEY = os.getenv("HWMAAS_API_KEY", "")
 # MaaS embedding 接入点与模型名：在 MaaS 控制台"调用说明"里复制，或由 ZY 填入 .env
 _ENDPOINT = os.getenv("HWMAAS_EMBED_ENDPOINT", "")   # 例：https://api.modelarts-maas.com/v1/embeddings

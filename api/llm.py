@@ -9,14 +9,17 @@
 
 import os
 
+from retrieval.maas_env import load
+load()
+
 try:
     import requests
 except ImportError:
     requests = None
 
 _API_KEY = os.getenv("HWMAAS_API_KEY", "")
-_MODEL = os.getenv("HWMAAS_MODEL", os.getenv("HWMAAS_MODEL", "DeepSeek-V4-Flash"))
-_ENDPOINT = os.getenv("HWMAAS_ENDPOINT", "https://maas.cn-north-4.myhuaweicloud.com/v1/inferences")
+_MODEL = os.getenv("HWMAAS_MODEL", "deepseek-v4-flash")
+_ENDPOINT = os.getenv("HWMAAS_ENDPOINT", "https://api.modelarts-maas.com/v1/chat/completions")
 
 SYSTEM_PROMPT = (
     "你是「珠科百事通」校务问答助手。根据检索到的官方通知内容回答学生问题。"
