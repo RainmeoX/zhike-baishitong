@@ -5,7 +5,8 @@ import re
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from retrieval.search import search, _extract_keywords
+from retrieval.search import search as keyword_search, _extract_keywords
+from retrieval.hybrid import hybrid_search
 from retrieval.db import get_conn
 from api.llm import generate as llm_generate, is_available as llm_available
 
@@ -85,7 +86,10 @@ def health():
 
 @app.post("/ask", response_model=AskResponse)
 def ask(req: AskRequest):
-    results = search(req.question, topk=req.topk)
+    try:
+        results = hybrid_search(req.question, topk=req.topk)  # 语义路可用则混合，否则自动退化
+    except Exception:
+        results = keyword_search(req.question, topk=req.topk)
     if not results:
         return AskResponse(answer=FALLBACK_ANSWER, confidence=0.0, references=[])
 
