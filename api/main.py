@@ -2,7 +2,11 @@
 
 import re
 
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from retrieval.search import search as keyword_search, _extract_keywords
@@ -11,6 +15,15 @@ from retrieval.db import get_conn
 from api.llm import generate as llm_generate, is_available as llm_available
 
 app = FastAPI(title="珠科百事通", description="珠科校务生活 RAG 问答接口")
+
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+_WEB = Path(__file__).resolve().parent.parent / "web"
+
+@app.get("/")
+def home():
+    """网页测试台（也用作文档入口）。"""
+    return FileResponse(_WEB / "index.html")
 
 FALLBACK_ANSWER = (
     "抱歉，当前知识库暂未检索到与您问题相关的官方信息。"

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>珠科百事通 · 测试台</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "微软雅黑", "Microsoft YaHei", sans-serif; background: #F5F7FA; color: #212121; min-height: 100vh; display: flex; flex-direction: column; }
+  header { background: #1565C0; color: #fff; padding: 14px 20px; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header p { font-size: 12px; opacity: .85; margin-top: 2px; }
+  main { flex: 1; max-width: 720px; width: 100%; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 14px; }
+  .qa { background: #fff; border: 1px solid #E0E0E0; border-radius: 10px; padding: 14px 16px; }
+  .q { color: #1565C0; font-weight: 600; font-size: 14px; }
+  .a { margin-top: 8px; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+  .meta { margin-top: 10px; font-size: 12px; color: #616161; }
+  .conf { display: inline-block; padding: 1px 8px; border-radius: 10px; background: #E8F5E9; color: #2E7D32; margin-right: 8px; }
+  .refs { margin-top: 8px; border-top: 1px dashed #E0E0E0; padding-top: 8px; }
+  .refs a { color: #1565C0; text-decoration: none; font-size: 12px; display: block; margin-bottom: 4px; word-break: break-all; }
+  .refs a:hover { text-decoration: underline; }
+  .routes { font-size: 11px; color: #9E9E9E; }
+  .err { color: #C62828; font-size: 13px; }
+  form { display: flex; gap: 8px; position: sticky; bottom: 0; background: #F5F7FA; padding: 10px 0; }
+  input { flex: 1; padding: 12px 14px; border: 1px solid #E0E0E0; border-radius: 10px; font-size: 14px; outline: none; }
+  input:focus { border-color: #1565C0; }
+  button { padding: 12px 22px; background: #1565C0; color: #fff; border: none; border-radius: 10px; font-size: 14px; cursor: pointer; }
+  button:disabled { background: #90CAF9; cursor: wait; }
+  .hint { font-size: 12px; color: #9E9E9E; text-align: center; }
+  .loading { color: #9E9E9E; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>珠科百事通 · 测试台</h1>
+  <p>RAGGO!!!!! ｜ 接口：/ask ｜ 每条答案附官方出处</p>
+</header>
+<main id="log">
+  <p class="hint">输入问题开始测试，例如：宿舍空调坏了怎么报修 / 四六级什么时候报名 / 校巴几点发车</p>
+</main>
+<form onsubmit="return ask(event)">
+  <input id="q" placeholder="输入你的问题…" autocomplete="off" required>
+  <button id="btn">提问</button>
+</form>
+<script>
+async function ask(e) {
+  e.preventDefault();
+  const q = document.getElementById('q').value.trim();
+  if (!q) return false;
+  const btn = document.getElementById('btn'), log = document.getElementById('log');
+  btn.disabled = true;
+  const card = document.createElement('div');
+  card.className = 'qa';
+  card.innerHTML = '<div class="q">Q：' + q.replace(/</g,'&lt;') + '</div><div class="loading">检索中（关键词+语义双路 → 重排 → 生成）…</div>';
+  log.appendChild(card);
+  document.getElementById('q').value = '';
+  card.scrollIntoView({ behavior: 'smooth' });
+  try {
+    const r = await fetch('/ask', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: q, topk: 3 })
+    });
+    const d = await r.json();
+    let html = '<div class="a">' + d.answer.replace(/</g, '&lt;') + '</div>';
+    html += '<div class="meta"><span class="conf">置信度 ' + (d.confidence * 100).toFixed(0) + '%</span>' + new Date().toLocaleTimeString() + '</div>';
+    if (d.references && d.references.length) {
+      html += '<div class="refs"><b style="font-size:12px">官方出处：</b>';
+      for (const ref of d.references)
+        html += '<a href="' + ref.source_url + '" target="_blank">📄 ' + ref.title + '（' + ref.department + '）</a>';
+      html += '</div>';
+    }
+    card.innerHTML = '<div class="q">Q：' + q.replace(/</g,'&lt;') + '</div>' + html;
+  } catch (err) {
+    card.innerHTML = '<div class="q">Q：' + q.replace(/</g,'&lt;') + '</div><div class="err">请求失败：' + err.message + '（服务没起？先跑 python start.py）</div>';
+  }
+  btn.disabled = false;
+  card.scrollIntoView({ behavior: 'smooth' });
+  return false;
+}
+</script>
+</body>
+</html>
