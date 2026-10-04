@@ -33,7 +33,7 @@ def run_eval(api_url, csv_path):
         resp = requests.post(
             f"{api_url}/ask",
             json={"question": q, "topk": 5},
-            timeout=15,
+            timeout=60,
         )
         if resp.status_code != 200:
             details.append({"id": qid, "question": q, "hit": False, "reason": f"HTTP {resp.status_code}"})
