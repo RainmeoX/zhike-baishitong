@@ -1,4 +1,4 @@
-"""FastAPI 问答服务：问题 → 混合检索 → 生成（占位）→ 答案 + 出处。"""
+"""FastAPI 问答服务：问题 → 混合检索 → LLM 生成 → 答案 + 出处。"""
 
 import re
 
@@ -88,7 +88,7 @@ def _build_answer(top, results, query) -> tuple[str, float]:
     answer = f"根据「{top['title']}」：{snippet}"
     if len(results) > 1:
         answer += f"\n\n（另有 {len(results) - 1} 条相关依据，详见出处列表）"
-    answer += "\n\n（当前为检索抽取式回答，大模型生成能力待接入华为云 MaaS）"
+    answer += "\n\n（当前为检索抽取式回答，大模型生成未启用时以此兜底）"
 
     confidence = min(1.0, top["score"] / 10.0)
     return answer, confidence
@@ -109,13 +109,20 @@ def ask(req: AskRequest):
     answer, confidence = _build_answer(results[0], results, req.question)
 
     if llm_available():
+        # 传 top-k 多篇给 LLM，而非仅 top-1
         conn = get_conn()
-        row = conn.execute(
-            "SELECT content FROM documents WHERE doc_id=?", (results[0]["doc_id"],)
-        ).fetchone()
+        refs_for_llm = []
+        for r in results:
+            row = conn.execute(
+                "SELECT content FROM documents WHERE doc_id=?", (r["doc_id"],)
+            ).fetchone()
+            refs_for_llm.append({
+                "title": r["title"],
+                "department": r.get("department", ""),
+                "content": (row["content"] or "") if row else "",
+            })
         conn.close()
-        context = results[0]["title"] + "\n" + (row["content"] or "" if row else "")
-        llm_answer = llm_generate(req.question, context)
+        llm_answer = llm_generate(req.question, refs_for_llm)
         if llm_answer:
             answer = llm_answer
 

@@ -44,6 +44,7 @@ class SdyCrawler:
         seen = set()
         table = soup.select_one("table.wp_article_list_table")
         if table:
+            # 模式一：教务处 table.wp_article_list_table
             for a in table.select("a[title]"):
                 href = a.get("href", "")
                 if "/page.htm" not in href or href in seen:
@@ -58,24 +59,48 @@ class SdyCrawler:
                     date = sib.get_text(strip=True)
                 articles.append({"title": title, "url": href, "date": date})
         else:
-            for a in soup.select("a.column-news-item[href*='/page.htm']"):
-                href = a.get("href", "")
-                if href in seen:
-                    continue
-                title_el = a.select_one(".column-news-title")
-                date_el = a.select_one(".column-news-date")
-                title = title_el.get_text(strip=True) if title_el else ""
-                date = date_el.get_text(strip=True) if date_el else ""
-                if not title:
-                    continue
-                seen.add(href)
-                articles.append({"title": title, "url": href, "date": date})
+            column_items = soup.select("a.column-news-item[href*='/page.htm']")
+            if column_items:
+                # 模式二：后勤处 a.column-news-item
+                for a in column_items:
+                    href = a.get("href", "")
+                    if href in seen:
+                        continue
+                    title_el = a.select_one(".column-news-title")
+                    date_el = a.select_one(".column-news-date")
+                    title = title_el.get_text(strip=True) if title_el else ""
+                    date = date_el.get_text(strip=True) if date_el else ""
+                    if not title:
+                        continue
+                    seen.add(href)
+                    articles.append({"title": title, "url": href, "date": date})
+            else:
+                # 模式三：招生信息 li > a[href*="/page.htm"] > p(标题) + span(日期)
+                for a in soup.select("li a[href*='/page.htm']"):
+                    href = a.get("href", "")
+                    if href in seen:
+                        continue
+                    title_el = a.select_one("p")
+                    date_el = a.select_one("span")
+                    title = title_el.get_text(strip=True) if title_el else a.get_text(strip=True)
+                    date = date_el.get_text(strip=True) if date_el else ""
+                    if not title:
+                        continue
+                    seen.add(href)
+                    articles.append({"title": title, "url": href, "date": date})
         return articles, self._parse_total_pages(soup)
 
     def _parse_total_pages(self, soup):
         em = soup.select_one("em.all_pages")
         if em and em.get_text(strip=True).isdigit():
             return int(em.get_text(strip=True))
+        # 兜底：从"尾页"链接 listN.htm 提取总页数
+        for a in soup.select("a"):
+            text = a.get_text(strip=True)
+            if text == "尾页":
+                m = re.search(r"list(\d+)\.htm", a.get("href", ""))
+                if m:
+                    return int(m.group(1))
         return 1
 
     def parse_detail(self, html, url):

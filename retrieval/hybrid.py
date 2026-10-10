@@ -64,13 +64,18 @@ def hybrid_search(query, topk=5):
 
     # 重排精排（bge-reranker）：query vs 标题+正文，失败自动保持 RRF 序
     conn = get_conn()
+    empty_ids = set()  # 空内容文档 id（图片/表格页，reranker 无法有效评估）
     def _text_of(d):
         row = conn.execute("SELECT content FROM documents WHERE doc_id=?",
                            (str(d["doc_id"]),)).fetchone()
-        text = d["title"] + chr(10) + ((row["content"] or "")[:800] if row else "")
-        return text
-    results = rerank(query, results, _text_of, topk=topk)
-    conn.close()
+        content = (row["content"] or "") if row else ""
+        if content.strip():
+            return d["title"] + chr(10) + content[:800]
+        # 空内容文档（图片/表格页）：标题加权 + 部门/栏目补充上下文
+        empty_ids.add(str(d["doc_id"]))
+        dept = d.get("department", "")
+        return d["title"] + " " + d["title"] + f" {dept} {d.get('column_name', '')}"
+    results = rerank(query, results, _text_of, topk=len(results))  # 不截断，留给融合打分后裁
 
     # 时效降权：重排相关性 × 年份权重（当年 1.0 / 去年 0.75 / 更早 0.5）
     year = datetime.date.today().year
@@ -82,10 +87,29 @@ def hybrid_search(query, topk=5):
         if y >= year: return 1.0
         if y == year - 1: return 0.75
         return 0.5
+    # 最终分 = 融合分 × 时效权重
+    # 融合 rerank（精排）与 RRF（粗排）；空内容文档 reranker 无法有效评估，提高 RRF 权重
+    max_rrf = max((d["score"] for d in results), default=1)
     for d in results:
-        d["final_score"] = round(d.get("rerank_score", d.get("score", 0) / 1000) * _recency(d), 4)
+        rrf_norm = d["score"] / max_rrf if max_rrf > 0 else 0
+        rerank_s = d.get("rerank_score", rrf_norm)
+        if str(d["doc_id"]) in empty_ids:
+            blended = 0.2 * rerank_s + 0.8 * rrf_norm  # 空内容：信 RRF 远多于 rerank
+        else:
+            blended = 0.65 * rerank_s + 0.35 * rrf_norm
+        d["final_score"] = round(blended * _recency(d), 4)
     results.sort(key=lambda d: -d["final_score"])
-    return results
+    conn.close()
+    return results[:topk]
 
 def routes_of(result):
     return result.get("routes", "")
+
+
+if __name__ == "__main__":
+    import sys
+    if "--rebuild" in sys.argv:
+        ok, msg = rebuild_vectors()
+        print(f"{'✅' if ok else '⚠️'} {msg}")
+    else:
+        print("用法: python -m retrieval.hybrid --rebuild")

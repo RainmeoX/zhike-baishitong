@@ -1,10 +1,11 @@
-"""华为云 MaaS 大模型生成接入（预留）。
+"""华为云 MaaS 大模型生成接入。
 
-当拿到华为云 MaaS API key 后，设置环境变量即可启用：
-  export HWMAAS_API_KEY="your-key"
-  export HWMAAS_MODEL="DeepSeek-V4-Flash"  # 或其他模型
+环境变量（在项目 .env 中配置）：
+  HWMAAS_API_KEY=xxx
+  HWMAAS_MODEL=deepseek-v4-flash
+  HWMAAS_ENDPOINT=https://api.modelarts-maas.com/v1/chat/completions
 
-未设置 key 时自动降级为抽取式回答（当前模式）。
+未设置 key 时自动降级为抽取式回答。
 """
 
 import os
@@ -22,9 +23,13 @@ _MODEL = os.getenv("HWMAAS_MODEL", "deepseek-v4-flash")
 _ENDPOINT = os.getenv("HWMAAS_ENDPOINT", "https://api.modelarts-maas.com/v1/chat/completions")
 
 SYSTEM_PROMPT = (
-    "你是「珠科百事通」校务问答助手。根据检索到的官方通知内容回答学生问题。"
-    "要求：1) 答案简洁准确；2) 必须基于提供的参考内容，不编造；"
-    "3) 如果参考内容不足以回答，说明并建议联系相关部门。"
+    "你是「珠科百事通」校务问答助手，服务珠海科技学院 3.1 万在校生。\n"
+    "回答规则：\n"
+    "1. 用口语化、简洁的方式回答，像学长学姐给同学解答一样自然\n"
+    "2. 严格基于【参考内容】回答，不编造、不补充参考内容以外的信息\n"
+    "3. 回答末尾标注来源，格式：「（来源：部门-通知标题）」\n"
+    "4. 如果参考内容不足以回答，明确说明并建议联系相关部门\n"
+    "5. 涉及电话、时间、金额等关键信息，逐字引用原文，不改写"
 )
 
 
@@ -32,12 +37,12 @@ def is_available():
     return bool(_API_KEY) and requests is not None
 
 
-def generate(question, context, max_tokens=512):
+def generate(question, references, max_tokens=512):
     """调用华为云 MaaS 生成回答。
 
     Args:
         question: 学生问题
-        context: 检索到的参考内容（拼接的标题+摘要）
+        references: list[dict]，每项含 title/department/content 键
         max_tokens: 最大生成长度
 
     Returns:
@@ -46,7 +51,16 @@ def generate(question, context, max_tokens=512):
     if not is_available():
         return None
 
-    prompt = f"参考内容：\n{context}\n\n学生问题：{question}\n\n请根据参考内容回答："
+    # 构建多文档编号 context
+    parts = []
+    for i, ref in enumerate(references, 1):
+        dept = ref.get("department", "")
+        title = ref.get("title", "")
+        content = (ref.get("content", "") or "")[:800]  # 每篇截取 800 字
+        parts.append(f"[{i}] 部门：{dept} | 标题：{title}\n{content}")
+    context_block = "\n\n".join(parts)
+
+    prompt = f"【参考内容】\n{context_block}\n\n【学生问题】\n{question}\n\n请根据参考内容回答："
 
     try:
         resp = requests.post(
