@@ -12,6 +12,7 @@ import datetime
 import json
 import os
 import re
+import shutil
 import sys
 
 try:
@@ -131,12 +132,10 @@ def save_results(rate, details):
             ])
     paths.append(csv_path)
 
-    # latest 软链接（覆盖）
+    # latest 副本（覆盖，Windows 无需管理员权限）
     for ext, src in ((".json", json_path), (".csv", csv_path)):
         latest = os.path.join(_RESULTS_DIR, f"latest{ext}")
-        if os.path.exists(latest):
-            os.remove(latest)
-        os.symlink(os.path.basename(src), latest)
+        shutil.copy2(src, latest)
         paths.append(latest)
 
     return paths
