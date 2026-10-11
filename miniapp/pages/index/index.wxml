@@ -5,7 +5,7 @@
       <icon type="search" size="18" color="#999" />
       <input
         class="search-input"
-        placeholder="搜索校务问题，如"报修电话""
+        placeholder="搜索校务问题，如「报修电话」"
         value="{{inputValue}}"
         bindinput="onInput"
         confirm-type="search"
