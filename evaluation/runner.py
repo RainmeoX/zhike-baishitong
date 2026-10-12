@@ -59,6 +59,15 @@ def _matched_points(expected, text):
     return [p for p in points if _point_matched(p, text)]
 
 
+def _ref_text(r):
+    """引用自身判定文本：标题+部门+栏目。
+
+    不拼 LLM answer——answer 由引用内容生成，拼入判定文本会让
+    rank-1 恒命中，MRR/Recall 失真为 1.0，测不出真实检索排序。
+    """
+    return " ".join(r.get(key, "") for key in ("title", "department", "column"))
+
+
 def run_eval(api_url, csv_path, recall_k=5):
     with open(csv_path, encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
@@ -87,15 +96,13 @@ def run_eval(api_url, csv_path, recall_k=5):
             continue
 
         data = resp.json()
-        answer = data.get("answer", "")
         refs = data.get("references", [])
 
         # ── 逐引用判定命中位置（MRR）──
         points = [k.strip() for k in expected.split("、") if k.strip()] if expected else []
         first_hit_rank = 0  # 1-based，0 = 未命中
         for rank, r in enumerate(refs, 1):
-            ref_text = answer + " " + r.get("title", "")
-            if _matched_points(expected, ref_text):
+            if _matched_points(expected, _ref_text(r)):
                 first_hit_rank = rank
                 break
 
@@ -104,9 +111,7 @@ def run_eval(api_url, csv_path, recall_k=5):
 
         # ── Recall@K：top-K 引用覆盖的期望要点比例 ──
         if points:
-            all_ref_text = answer + " " + " ".join(
-                r.get("title", "") for r in refs[:recall_k]
-            )
+            all_ref_text = " ".join(_ref_text(r) for r in refs[:recall_k])
             matched = len(_matched_points(expected, all_ref_text))
             recall = matched / len(points)
         else:
