@@ -1,9 +1,12 @@
-"""华为云 MaaS 大模型生成接入。
+"""大模型生成接入（智谱 GLM-4-Flash / 华为云 MaaS 均可）。
 
 环境变量（在项目 .env 中配置）：
-  HWMAAS_API_KEY=xxx
-  HWMAAS_MODEL=deepseek-v4-flash
-  HWMAAS_ENDPOINT=https://api.modelarts-maas.com/v1/chat/completions
+  LLM_API_KEY=xxx          # 智谱 API Key
+  LLM_MODEL=glm-4-flash    # 模型名
+  LLM_ENDPOINT=https://open.bigmodel.cn/api/paas/v4/chat/completions
+
+  # 向后兼容：若未设 LLM_* 则回退到 HWMAAS_*
+  HWMAAS_API_KEY / HWMAAS_MODEL / HWMAAS_ENDPOINT
 
 未设置 key 时自动降级为抽取式回答。
 """
@@ -18,9 +21,10 @@ try:
 except ImportError:
     requests = None
 
-_API_KEY = os.getenv("HWMAAS_API_KEY", "")
-_MODEL = os.getenv("HWMAAS_MODEL", "deepseek-v4-flash")
-_ENDPOINT = os.getenv("HWMAAS_ENDPOINT", "https://api.modelarts-maas.com/v1/chat/completions")
+# 优先读 LLM_*，回退 HWMAAS_*（向后兼容）
+_API_KEY = os.getenv("LLM_API_KEY", "") or os.getenv("HWMAAS_API_KEY", "")
+_MODEL = os.getenv("LLM_MODEL", "") or os.getenv("HWMAAS_MODEL", "deepseek-v4-flash")
+_ENDPOINT = os.getenv("LLM_ENDPOINT", "") or os.getenv("HWMAAS_ENDPOINT", "https://api.modelarts-maas.com/v1/chat/completions")
 
 SYSTEM_PROMPT = (
     "你是「珠科百事通」校务问答助手，服务珠海科技学院 3.1 万在校生。\n"
