@@ -11,7 +11,7 @@
         confirm-type="search"
         bindconfirm="onSearch"
       />
-      <view wx:if="{{inputValue}}" class="clear-btn" bindtap="onInput">
+      <view wx:if="{{inputValue}}" class="clear-btn" catchtap="onClearInput">
         <icon type="clear" size="16" color="#999" />
       </view>
     </view>
