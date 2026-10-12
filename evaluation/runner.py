@@ -15,6 +15,9 @@ import re
 import shutil
 import sys
 
+# Windows 控制台默认 GBK 编码，打不出 emoji，强制切 UTF-8
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 try:
     import requests
 except ImportError:

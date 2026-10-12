@@ -25,3 +25,6 @@ opencode.json
 
 # 智能体会话目录（不入库）
 .codeartsdoer/
+
+# 打包产物（不入库）
+submission/output/
