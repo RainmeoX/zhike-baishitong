@@ -57,6 +57,20 @@ python -m retrieval.index                           # 数据入库
 python -m uvicorn api.main:app --port 8000          # 启 API
 ```
 
+### Docker 部署（评委一键启动）
+
+```bash
+# 构建镜像
+docker build -t zhike-baishitong .
+
+# 运行（data/ 运行时挂载，密钥经 .env 注入）
+docker run -p 8000:8000 --env-file .env -v ./data:/app/data zhike-baishitong
+```
+
+- 镜像基于 `python:3.12-slim`，内置 HEALTHCHECK（每 30s 探测 `/health`），`docker ps` 可见 healthy 状态
+- `data/` 通过 `-v` 挂载进容器，首次启动 `start.py` 自动建库，已有数据可直接复用
+- 大模型与 embedding 密钥通过 `--env-file .env` 注入，勿提交 `.env`
+
 测试：
 
 ```bash
