@@ -50,6 +50,9 @@ python -m uvicorn api.main:app --port 8000       # 起 API
 6. **中文注释**：核心逻辑注释用中文，commit message 遵循 Conventional Commits 规范（详见 CONTRIBUTING.md）
 7. **敏感词自查**：提交前对改动文件执行 `grep -ri` 检查（密钥/密钥变量值/内部路径），有命中先报告再改
 8. **原子提交**：一个 commit 只做一件事，一堆不相关改动拆成多个 commit，禁止 `git add -A` 一锅端
+9. **推送节奏**：平时只做本地原子 commit，每完成一个完整功能闭环
+   （代码+测试全过+验证）才推一次远程；不逐 commit 推送、不每天例行推送、
+   不主动催推送（换机器等怕丢工作的场景除外，详见 CONTRIBUTING.md）
 
 ## 协作方式
 

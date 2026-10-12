@@ -90,3 +90,21 @@ git commit -m "wip"
 # ❌ 自造 type
 git commit -m "fix+log: 修复超时并记录日志"
 ```
+
+## 推送节奏（大功能闭环推）
+
+平时只做本地原子 commit，**每完成一个完整功能闭环才推一次远程**：
+
+- **功能闭环定义**：代码改动 + `python -m pytest tests/ -q` 全过 + 验证通过（评测跑通/接口自测等）
+- **推送时机**：闭环完成即推，一次推送可包含该闭环的多个原子 commit
+- **推之前**：`git log --oneline origin/master..HEAD` 过一遍未推送 commit，确认没有临时/杂项需要清理
+- **禁止**：逐 commit 推送、每天例行推送、主动催推送
+- **例外**：换机器、长时间离开等怕丢工作的场景可随时推送
+
+赛期内预计 4-6 次推送（如：评测修复闭环、评测集扩容闭环、小程序联调闭环、赛前最终提交）。
+
+```bash
+# 闭环完成后推送
+git log --oneline origin/master..HEAD   # 检查未推送的 commit
+git push                                 # 一次推完
+```
