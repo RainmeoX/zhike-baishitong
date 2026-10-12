@@ -7,8 +7,11 @@
 """
 import os, json, urllib.request
 
+from api.log import get_logger
 from retrieval.maas_env import load
 load()
+
+logger = get_logger(__name__)
 
 # 主路：硅基流动（HWMAAS_* 变量名沿用，实际指向硅基流动）
 _API_KEY = os.getenv("HWMAAS_API_KEY", "")
@@ -51,8 +54,8 @@ def embed(texts):
     if _API_KEY and _ENDPOINT and _MODEL:
         try:
             return _embed_call(_ENDPOINT, _MODEL, _API_KEY, texts)
-        except Exception:
-            pass  # 降级到备路
+        except Exception as e:
+            logger.warning("embedding 主路失败，降级备路: %s", e)
     # 备路
     if _FB_KEY and _FB_ENDPOINT and _FB_MODEL:
         return _embed_call(_FB_ENDPOINT, _FB_MODEL, _FB_KEY, texts, proxy=_FB_PROXY)

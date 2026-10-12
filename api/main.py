@@ -9,10 +9,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from api.log import get_logger
 from retrieval.search import search as keyword_search, _extract_keywords
 from retrieval.hybrid import hybrid_search
 from retrieval.db import get_conn
 from api.llm import generate as llm_generate, is_available as llm_available
+
+logger = get_logger(__name__)
 
 app = FastAPI(title="珠科百事通", description="珠科校务生活 RAG 问答接口")
 
@@ -101,7 +104,8 @@ def health():
 def ask(req: AskRequest):
     try:
         results = hybrid_search(req.question, topk=req.topk)  # 语义路可用则混合，否则自动退化
-    except Exception:
+    except Exception as e:
+        logger.warning("hybrid_search 失败，降级关键词路: %s", e)
         results = keyword_search(req.question, topk=req.topk)
     if not results:
         return AskResponse(answer=FALLBACK_ANSWER, confidence=0.0, references=[])

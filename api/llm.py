@@ -13,8 +13,11 @@
 
 import os
 
+from api.log import get_logger
 from retrieval.maas_env import load
 load()
+
+logger = get_logger(__name__)
 
 try:
     import requests
@@ -87,6 +90,7 @@ def generate(question, references, max_tokens=512):
         if resp.status_code == 200:
             data = resp.json()
             return data.get("choices", [{}])[0].get("message", {}).get("content", "")
-    except Exception:
-        pass
+        logger.warning("LLM 返回非 200: status=%s", resp.status_code)
+    except Exception as e:
+        logger.warning("LLM 调用失败，降级抽取式: %s", e)
     return None

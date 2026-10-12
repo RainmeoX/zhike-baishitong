@@ -7,8 +7,11 @@
 """
 import json, os, urllib.request
 
+from api.log import get_logger
 from retrieval.maas_env import load
 load()
+
+logger = get_logger(__name__)
 
 # 主路：硅基流动（HWMAAS_* 变量名沿用，实际指向硅基流动）
 _API_KEY = os.getenv("HWMAAS_API_KEY", "")
@@ -57,12 +60,12 @@ def rerank(query, docs, text_of, topk=None):
     if _API_KEY and _ENDPOINT and _MODEL:
         try:
             return _rerank_call(_ENDPOINT, _MODEL, _API_KEY, query, docs, text_of, topk)
-        except Exception:
-            pass  # 降级到备路
+        except Exception as e:
+            logger.warning("rerank 主路失败，降级备路: %s", e)
     # 备路
     if _FB_KEY and _FB_ENDPOINT and _FB_MODEL:
         try:
             return _rerank_call(_FB_ENDPOINT, _FB_MODEL, _FB_KEY, query, docs, text_of, topk, proxy=_FB_PROXY)
-        except Exception:
-            pass  # 两路都失败
+        except Exception as e:
+            logger.warning("rerank 备路也失败，保持 RRF 原序: %s", e)
     return docs[:topk] if topk else docs

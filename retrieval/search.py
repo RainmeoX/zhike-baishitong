@@ -2,7 +2,10 @@
 
 import re
 
+from api.log import get_logger
 from retrieval.db import get_conn, init_db
+
+logger = get_logger(__name__)
 
 SYNONYMS = {
     # ── 交通 ──
@@ -107,8 +110,8 @@ def search(query, topk=10, db_path=None, conn=None):
             ).fetchall()
             for row in rows:
                 scored[row["doc_id"]] = scored.get(row["doc_id"], 0) + 10
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("FTS5 查询失败，跳过全文索引路: %s", e)
 
     for kw in _extract_keywords(query):
         like = f"%{kw}%"

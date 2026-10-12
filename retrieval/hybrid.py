@@ -6,10 +6,13 @@
 """
 import datetime, json
 
+from api.log import get_logger
 from retrieval import vector
 from retrieval.rerank import rerank
 from retrieval.search import search as keyword_search
 from retrieval.db import get_conn
+
+logger = get_logger(__name__)
 
 RRF_K = 60  # RRF 常数
 
@@ -47,8 +50,8 @@ def hybrid_search(query, topk=5):
             for rank, (did, _) in enumerate(vector.semantic_search(query, topk=topk)):
                 scores[did] = scores.get(did, 0) + 1.0 / (RRF_K + rank + 1)
                 routes.setdefault(did, set()).add("sem")
-        except Exception:
-            pass  # 语义路失败 → 关键词路兜底
+        except Exception as e:
+            logger.warning("语义路失败，关键词路兜底: %s", e)
 
     fused = sorted(scores.items(), key=lambda x: -x[1])[:topk * 2]  # 候选池留给重排
 
