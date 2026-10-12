@@ -146,3 +146,46 @@ class TestHybridSearchRRF:
                 titles.add(r[0]["title"])
         # 至少有两种不同 top-1
         assert len(titles) >= 2
+
+
+class TestRetrievalFixes:
+    """诊断报告修复 1+2 的行为验证：空内容降权封顶 + 制度类时效豁免。
+
+    依赖库内真实数据（docs/检索诊断报告.md 中的 bad case），库为空时跳过断言。
+    """
+
+    def test_dorm_water_fee_top1(self):
+        """Q7：宿舍水费 → 收费办法（制度类豁免）登顶，空内容页不登顶。"""
+        results = hybrid_search("宿舍水费怎么交", topk=5)
+        if results:
+            assert "水费" in results[0]["title"]
+
+    def test_canteen_rules_top1(self):
+        """Q8：食堂就餐规定 → 就餐须知（制度类豁免）登顶。"""
+        results = hybrid_search("食堂就餐有什么规定", topk=5)
+        if results:
+            assert "就餐须知" in results[0]["title"]
+
+    def test_hygiene_rules_top1(self):
+        """Q24：卫生管理规定 → 校内卫生管理规定（制度类豁免）登顶。"""
+        results = hybrid_search("校内卫生管理规定", topk=5)
+        if results:
+            assert "卫生管理规定" in results[0]["title"]
+
+    def test_power_plan_top1(self):
+        """Q27：安全用电 → 用电预案（制度类豁免）登顶。"""
+        results = hybrid_search("安全用电有什么要求", topk=5)
+        if results:
+            assert "用电" in results[0]["title"] and "预案" in results[0]["title"]
+
+    def test_water_supply_plan_top1(self):
+        """Q29：二次供水事故应急预案（制度类豁免）登顶。"""
+        results = hybrid_search("二次供水事故应急预案", topk=5)
+        if results:
+            assert "二次供水" in results[0]["title"]
+
+    def test_evergreen_keyword_constant(self):
+        """制度类豁免关键词应含办法/规定/预案/制度/须知/细则。"""
+        from retrieval.hybrid import EVERGREEN_KEYWORDS
+        for k in ("办法", "规定", "预案", "制度", "须知", "细则"):
+            assert k in EVERGREEN_KEYWORDS

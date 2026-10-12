@@ -16,6 +16,9 @@ logger = get_logger(__name__)
 
 RRF_K = 60  # RRF 常数
 
+# 制度类长期有效文档关键词：标题命中则不做时效降权（诊断报告修复 2）
+EVERGREEN_KEYWORDS = ("办法", "规定", "预案", "制度", "须知", "细则")
+
 def rebuild_vectors():
     """从 documents 表全量重建向量库。返回 (ok, message)。"""
     conn = get_conn()
@@ -81,8 +84,12 @@ def hybrid_search(query, topk=5):
     results = rerank(query, results, _text_of, topk=len(results))  # 不截断，留给融合打分后裁
 
     # 时效降权：重排相关性 × 年份权重（当年 1.0 / 去年 0.75 / 更早 0.5）
+    # 制度类长期有效文档（办法/规定/预案/制度/须知/细则）不做时效降权
     year = datetime.date.today().year
     def _recency(d):
+        title = d.get("title", "") or ""
+        if any(k in title for k in EVERGREEN_KEYWORDS):
+            return 1.0
         try:
             y = int(str(d.get("publish_time", ""))[:4])
         except (ValueError, TypeError):
@@ -97,7 +104,7 @@ def hybrid_search(query, topk=5):
         rrf_norm = d["score"] / max_rrf if max_rrf > 0 else 0
         rerank_s = d.get("rerank_score", rrf_norm)
         if str(d["doc_id"]) in empty_ids:
-            blended = 0.2 * rerank_s + 0.8 * rrf_norm  # 空内容：信 RRF 远多于 rerank
+            blended = 0.2 * rerank_s + 0.4 * rrf_norm  # 空内容：降权封顶 0.4，防止空页登顶（诊断报告修复 1）
         else:
             blended = 0.65 * rerank_s + 0.35 * rrf_norm
         d["final_score"] = round(blended * _recency(d), 4)
