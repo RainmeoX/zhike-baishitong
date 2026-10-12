@@ -7,7 +7,9 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from api.main import _extract_snippet
+import pytest
+from pydantic import ValidationError
+from api.main import _extract_snippet, AskRequest
 
 
 class TestExtractSnippet:
@@ -35,3 +37,50 @@ class TestExtractSnippet:
         content = "前置内容。选课时间安排。后续内容。更多内容。"
         snippet = _extract_snippet(content, "选课时间", max_len=200)
         assert "选课时间" in snippet
+
+
+class TestAskRequestValidation:
+    """输入校验测试。"""
+
+    def test_valid_request(self):
+        req = AskRequest(question="选课怎么操作", topk=5)
+        assert req.question == "选课怎么操作"
+        assert req.topk == 5
+
+    def test_default_topk(self):
+        req = AskRequest(question="校巴")
+        assert req.topk == 5
+
+    def test_empty_question_rejected(self):
+        with pytest.raises(ValidationError):
+            AskRequest(question="", topk=5)
+
+    def test_blank_question_rejected(self):
+        with pytest.raises(ValidationError):
+            AskRequest(question="   ", topk=5)
+
+    def test_question_stripped(self):
+        req = AskRequest(question="  选课  ", topk=5)
+        assert req.question == "选课"
+
+    def test_question_too_long_rejected(self):
+        with pytest.raises(ValidationError):
+            AskRequest(question="x" * 501, topk=5)
+
+    def test_question_max_length_accepted(self):
+        req = AskRequest(question="x" * 500, topk=5)
+        assert len(req.question) == 500
+
+    def test_topk_too_small_rejected(self):
+        with pytest.raises(ValidationError):
+            AskRequest(question="选课", topk=0)
+
+    def test_topk_too_large_rejected(self):
+        with pytest.raises(ValidationError):
+            AskRequest(question="选课", topk=21)
+
+    def test_topk_boundary_accepted(self):
+        req1 = AskRequest(question="选课", topk=1)
+        req2 = AskRequest(question="选课", topk=20)
+        assert req1.topk == 1
+        assert req2.topk == 20

@@ -4,10 +4,10 @@ import re
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel, Field, field_validator
 
 from api.log import get_logger
 from retrieval.search import search as keyword_search, _extract_keywords
@@ -35,8 +35,15 @@ FALLBACK_ANSWER = (
 )
 
 class AskRequest(BaseModel):
-    question: str
-    topk: int = 5
+    question: str = Field(..., min_length=1, max_length=500, description="学生问题（1-500 字）")
+    topk: int = Field(default=5, ge=1, le=20, description="返回条数（1-20）")
+
+    @field_validator("question")
+    @classmethod
+    def question_not_blank(cls, v):
+        if not v.strip():
+            raise ValueError("问题不能为空白")
+        return v.strip()
 
 class Reference(BaseModel):
     title: str
@@ -49,6 +56,10 @@ class AskResponse(BaseModel):
     answer: str
     confidence: float
     references: list[Reference]
+
+class ErrorResponse(BaseModel):
+    error: str
+    detail: str = ""
 
 def _extract_snippet(content, query, max_len=300):
     if not content or not content.strip():
@@ -100,13 +111,26 @@ def _build_answer(top, results, query) -> tuple[str, float]:
 def health():
     return {"status": "ok"}
 
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """全局异常兜底：未预期的错误返回结构化 500，不泄露堆栈。"""
+    logger.error("未处理异常: %s %s -> %s", request.method, request.url.path, exc, exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"error": "internal_error", "detail": "服务内部错误，请稍后重试"},
+    )
+
 @app.post("/ask", response_model=AskResponse)
 def ask(req: AskRequest):
     try:
         results = hybrid_search(req.question, topk=req.topk)  # 语义路可用则混合，否则自动退化
     except Exception as e:
         logger.warning("hybrid_search 失败，降级关键词路: %s", e)
-        results = keyword_search(req.question, topk=req.topk)
+        try:
+            results = keyword_search(req.question, topk=req.topk)
+        except Exception as e2:
+            logger.error("关键词路也失败: %s", e2)
+            raise HTTPException(status_code=503, detail="检索服务暂时不可用")
     if not results:
         return AskResponse(answer=FALLBACK_ANSWER, confidence=0.0, references=[])
 
