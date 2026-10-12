@@ -47,8 +47,9 @@ python -m uvicorn api.main:app --port 8000       # 起 API
 4. **不编造数据**：评测集问题必须来自真实学生视角，期望答案必须对应真实通知内容
 5. **路径中性**：代码/脚本/文档中的 Python 一律用上面的系统 Python 3.12 路径，
    不引用任何个人目录或私有工具链路径；叙述中 AI 工具只提"华为云码道 CodeArts"
-6. **中文注释**：核心逻辑注释用中文，commit 信息写清楚做了什么
+6. **中文注释**：核心逻辑注释用中文，commit message 遵循 Conventional Commits 规范（详见 CONTRIBUTING.md）
 7. **敏感词自查**：提交前对改动文件执行 `grep -ri` 检查（密钥/密钥变量值/内部路径），有命中先报告再改
+8. **原子提交**：一个 commit 只做一件事，一堆不相关改动拆成多个 commit，禁止 `git add -A` 一锅端
 
 ## 协作方式
 
