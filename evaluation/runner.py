@@ -1,4 +1,4 @@
-"""评测运行器：对 questions.csv 每题跑 /ask，输出 Hit Rate / MRR / Recall@K。
+"""评测运行器：对 questions.csv 每题跑 /ask，输出 Hit Rate / MRR / Recall@K / 引用正确率。
 
 用法：
   python -m evaluation.runner --api http://127.0.0.1:8000
@@ -22,6 +22,9 @@ try:
     import requests
 except ImportError:
     sys.exit("需要 requests：pip install requests")
+
+# 引用正确性抽检需要读库（retrieval.db 仅依赖标准库，无额外负担）
+from retrieval.db import get_conn, DB_PATH
 
 _RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
 
@@ -68,14 +71,88 @@ def _ref_text(r):
     return " ".join(r.get(key, "") for key in ("title", "department", "column"))
 
 
+# ── 引用正确性抽检 ──
+# LLM 答案末尾标注「（来源：部门-通知标题）」，兜底答案形如「根据「标题」：摘要」
+_CITE_PATTERNS = (
+    re.compile(r"[（(]来源[：:]\s*([^）)]+)[）)]"),
+    re.compile(r"根据[「『]([^」』]+)[」』]"),
+)
+
+
+def _cited_sources(answer):
+    """从答案文本提取被引出处字符串（去重保序）。"""
+    if not answer:
+        return []
+    seen, sources = set(), []
+    for pat in _CITE_PATTERNS:
+        for m in pat.finditer(answer):
+            s = m.group(1).strip()
+            if s and s not in seen:
+                seen.add(s)
+                sources.append(s)
+    return sources
+
+
+def _load_title_content(db_path=None):
+    """从库建 title→content 映射；库缺失、无文档表或无数据时返回 None（跳过抽检）。"""
+    path = str(db_path) if db_path else str(DB_PATH)
+    if not os.path.exists(path):
+        return None
+    try:
+        conn = get_conn(db_path)
+        rows = conn.execute("SELECT title, content FROM documents").fetchall()
+        conn.close()
+    except Exception:
+        return None
+    if not rows:
+        return None
+    return {r["title"]: r["content"] for r in rows}
+
+
+def _resolve_cited_doc(source, title_content):
+    """把「部门-标题」出处解析为库内文档标题，未命中返回 None。
+
+    精确匹配 → 标题包含于出处串 → 取「-」后缀匹配，选最长命中减少误配。
+    """
+    if source in title_content:
+        return source
+    tail = source.rsplit("-", 1)[-1].strip()
+    candidates = [t for t in title_content if t and (t in source or (tail and tail in t))]
+    return max(candidates, key=len) if candidates else None
+
+
+def _citation_check(answer, expected, title_content):
+    """引用正确性抽检：每条被引出处解析到文档后，正文含 ≥1 个期望要点即算对。
+
+    返回 (被引总数, 正确数)；title_content 为 None 时返回 None（跳过）。
+    出处解析不到库内文档计为不正确（无法验证即不可信）。
+    """
+    if title_content is None:
+        return None
+    total = ok = 0
+    for s in _cited_sources(answer):
+        total += 1
+        title = _resolve_cited_doc(s, title_content)
+        if title and _matched_points(expected, title_content[title]):
+            ok += 1
+    return total, ok
+
+
 def run_eval(api_url, csv_path, recall_k=5):
     with open(csv_path, encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
+
+    # 引用抽检前置：库缺失则整场跳过（不阻塞评测主流程）
+    title_content = _load_title_content()
+    if title_content is None:
+        print("⚠️  未找到爬取数据（data/zcst.db），本轮跳过引用正确性抽检")
 
     total = len(rows)
     hits = 0
     mrr_sum = 0.0
     recall_sum = 0.0
+    cite_total = 0
+    cite_ok = 0
     details = []
 
     for row in rows:
@@ -84,11 +161,19 @@ def run_eval(api_url, csv_path, recall_k=5):
         expected = row.get("期望答案要点", row.get("expected", ""))
         category = row.get("类别", row.get("category", ""))
 
-        resp = requests.post(
-            f"{api_url}/ask",
-            json={"question": q, "topk": 5},
-            timeout=60,
-        )
+        try:
+            resp = requests.post(
+                f"{api_url}/ask",
+                json={"question": q, "topk": 5},
+                timeout=60,
+            )
+        except Exception as e:
+            # 连接失败等异常：单题跳过，不中断整场评测
+            details.append({"id": qid, "question": q, "hit": False,
+                            "mrr": 0.0, "recall_at_k": 0.0,
+                            "reason": f"请求失败 {e}"})
+            print(f"[跳过] {qid}: 请求失败 {e}")
+            continue
         if resp.status_code != 200:
             details.append({"id": qid, "question": q, "hit": False,
                             "mrr": 0.0, "recall_at_k": 0.0,
@@ -97,6 +182,7 @@ def run_eval(api_url, csv_path, recall_k=5):
 
         data = resp.json()
         refs = data.get("references", [])
+        answer = data.get("answer", "")
 
         # ── 逐引用判定命中位置（MRR）──
         points = [k.strip() for k in expected.split("、") if k.strip()] if expected else []
@@ -117,6 +203,12 @@ def run_eval(api_url, csv_path, recall_k=5):
         else:
             recall = 0.0
 
+        # ── 引用正确性抽检：被引文档正文是否含期望要点 ──
+        cite = _citation_check(answer, expected, title_content)
+        if cite is not None:
+            cite_total += cite[0]
+            cite_ok += cite[1]
+
         if hit:
             hits += 1
         mrr_sum += rr
@@ -133,27 +225,36 @@ def run_eval(api_url, csv_path, recall_k=5):
             "recall_at_k": round(recall, 4),
             "confidence": data.get("confidence", 0),
             "top_title": refs[0]["title"] if refs else "",
+            "cite_ok": cite[1] if cite is not None else 0,
+            "cite_total": cite[0] if cite is not None else 0,
         })
 
     rate = hits / total * 100 if total else 0
     mrr = mrr_sum / total if total else 0
     recall_at_k = recall_sum / total if total else 0
+    cite_prec = cite_ok / cite_total * 100 if cite_total else None
 
     print(f"\n{'='*60}")
     print(f"评测结果：{hits}/{total} 命中")
     print(f"  Hit Rate   : {rate:.1f}%")
     print(f"  MRR        : {mrr:.4f}")
     print(f"  Recall@{recall_k}   : {recall_at_k:.4f}")
+    if cite_prec is not None:
+        print(f"  引用正确率 : {cite_prec:.1f}%（{cite_ok}/{cite_total} 条引用验证通过）")
+    elif title_content is not None:
+        print(f"  引用正确率 : 无引用可校验")
+    else:
+        print(f"  引用正确率 : 跳过（未找到爬取数据）")
     print(f"{'='*60}")
 
     for d in details:
-        mark = "✅" if d["hit"] else "❌"
-        rank_str = f"r{d['hit_rank']}" if d["hit"] else "r-"
-        print(f"  {mark} [{d['id']}] {d['question'][:20]} | {d['category']} "
-              f"| {rank_str} | MRR={d['mrr']:.2f} | R@{recall_k}={d['recall_at_k']:.2f} "
-              f"| {d['top_title'][:25]}")
+        mark = "✅" if d.get("hit") else "❌"
+        rank_str = f"r{d['hit_rank']}" if d.get("hit") else "r-"
+        print(f"  {mark} [{d.get('id', '')}] {d.get('question', '')[:20]} | {d.get('category', '')} "
+              f"| {rank_str} | MRR={d.get('mrr', 0):.2f} | R@{recall_k}={d.get('recall_at_k', 0):.2f} "
+              f"| {d.get('top_title', '')[:25]}")
 
-    return rate, mrr, recall_at_k, details
+    return rate, mrr, recall_at_k, cite_prec, details
 
 
 def save_results(rate, mrr, recall_at_k, details, recall_k=5):
@@ -161,6 +262,10 @@ def save_results(rate, mrr, recall_at_k, details, recall_k=5):
     os.makedirs(_RESULTS_DIR, exist_ok=True)
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     paths = []
+
+    # 引用正确率：从明细微平均（Σok/Σtotal），无引用则记 null
+    c_total = sum(d.get("cite_total", 0) for d in details)
+    c_ok = sum(d.get("cite_ok", 0) for d in details)
 
     # JSON 全量明细
     json_path = os.path.join(_RESULTS_DIR, f"eval_{ts}.json")
@@ -171,6 +276,7 @@ def save_results(rate, mrr, recall_at_k, details, recall_k=5):
         "hit_rate": round(rate, 1),
         "mrr": round(mrr, 4),
         f"recall_at_{recall_k}": round(recall_at_k, 4),
+        "citation_precision": round(c_ok / c_total * 100, 1) if c_total else None,
         "details": details,
     }
     with open(json_path, "w", encoding="utf-8") as f:
@@ -182,13 +288,15 @@ def save_results(rate, mrr, recall_at_k, details, recall_k=5):
     with open(csv_path, "w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["id", "question", "category", "hit", "hit_rank",
-                         "mrr", f"recall_at_{recall_k}", "confidence", "top_title", "expected"])
+                         "mrr", f"recall_at_{recall_k}", "confidence", "top_title", "expected",
+                         "cite_ok", "cite_total"])
         for d in details:
             writer.writerow([
                 d.get("id", ""), d.get("question", ""), d.get("category", ""),
                 d.get("hit", False), d.get("hit_rank", 0),
                 d.get("mrr", 0), d.get("recall_at_k", 0),
                 d.get("confidence", 0), d.get("top_title", ""), d.get("expected", ""),
+                d.get("cite_ok", 0), d.get("cite_total", 0),
             ])
     paths.append(csv_path)
 
@@ -209,7 +317,7 @@ def main():
     parser.add_argument("--recall-k", type=int, default=5, help="Recall@K 的 K 值（默认 5）")
     args = parser.parse_args()
 
-    rate, mrr, recall_at_k, details = run_eval(args.api, args.csv, recall_k=args.recall_k)
+    rate, mrr, recall_at_k, cite_prec, details = run_eval(args.api, args.csv, recall_k=args.recall_k)
     if rate < 85:
         print(f"\n⚠️  当前 Hit Rate {rate:.1f}% < 85% 目标，需优化检索或补充数据")
     else:
@@ -217,6 +325,8 @@ def main():
 
     print(f"   MRR = {mrr:.4f}（越接近 1 越好，1 = 全部 top-1 命中）")
     print(f"   Recall@{args.recall_k} = {recall_at_k:.4f}（越接近 1 越好）")
+    if cite_prec is not None:
+        print(f"   引用正确率 = {cite_prec:.1f}%（被引文档需含期望要点才算验证通过）")
 
     if args.save:
         paths = save_results(rate, mrr, recall_at_k, details, recall_k=args.recall_k)
