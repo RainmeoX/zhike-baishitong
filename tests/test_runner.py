@@ -14,6 +14,8 @@ from evaluation.runner import (
     _resolve_cited_doc,
     _citation_check,
     _point_matched,
+    _is_refusal,
+    run_eval,
 )
 
 
@@ -134,3 +136,104 @@ class TestPointMatched:
     def test_long_point_fuzzy(self):
         # 长要点按子串覆盖率 ≥30% 模糊匹配
         assert _point_matched("选课时间为9月1日至9月5日", "选课时间为9月1日至9月5日，请登录系统") is True
+
+
+class TestIsRefusal:
+    def test_fallback_answer_is_refusal(self):
+        # 兜底答案「暂未检索到…建议联系…」
+        ans = "抱歉，当前知识库暂未检索到与您问题相关的官方信息。建议联系对应部门获取最新答复。"
+        assert _is_refusal(ans) is True
+
+    def test_llm_insufficient_is_refusal(self):
+        # LLM 说明不足类回答
+        assert _is_refusal("参考内容不足以回答该问题，建议联系教务处。") is True
+
+    def test_normal_answer_not_refusal(self):
+        assert _is_refusal("选课时间为9月1日。（来源：教务处-选课通知）") is False
+
+    def test_empty_answer_not_refusal(self):
+        assert _is_refusal("") is False
+
+
+class TestRunEvalRefusal:
+    """拒答题（期望要点为空）不计入 Hit Rate 分母，单独统计拒答成功率。"""
+
+    def _write_csv(self, tmp_path, rows):
+        csv_path = tmp_path / "questions.csv"
+        lines = ["id,问题,类别,期望答案要点,来源"]
+        lines.extend(rows)
+        csv_path.write_text("\n".join(lines), encoding="utf-8")
+        return str(csv_path)
+
+    def _patch(self, tmp_path, monkeypatch, responses):
+        def fake_post(url, json=None, timeout=60):
+            class R:
+                status_code = 200
+
+                def json(self):
+                    return responses[json["question"]]
+            return R()
+
+        monkeypatch.setattr("evaluation.runner.requests.post", fake_post)
+        # 库指向不存在路径，跳过引用抽检，保持测试封闭
+        monkeypatch.setattr("evaluation.runner.DB_PATH", tmp_path / "no_such.db")
+
+    def test_refusal_counted_separately(self, tmp_path, monkeypatch):
+        # 1 道可答题命中 + 1 道拒答题正确说明：Hit Rate 分母只算可答题
+        csv_path = self._write_csv(tmp_path, [
+            "1,报修电话是多少,后勤-报修,报修电话,学校通知",
+            "2,校长手机号是多少,陷阱,,学校通知",
+        ])
+        self._patch(tmp_path, monkeypatch, {
+            "报修电话是多少": {
+                "answer": "报修电话为0756-7626267。（来源：后勤处-报修电话指南）",
+                "references": [{"title": "报修电话指南", "department": "后勤处", "column": "通知"}],
+                "confidence": 0.9,
+            },
+            "校长手机号是多少": {
+                "answer": "抱歉，当前知识库暂未检索到与您问题相关的官方信息。建议联系对应部门。",
+                "references": [],
+                "confidence": 0.0,
+            },
+        })
+        rate, mrr, recall_at_k, cite_prec, refusal_rate, details = run_eval("http://x", csv_path)
+        assert rate == 100.0
+        assert refusal_rate == 100.0
+        assert cite_prec is None
+        assert len(details) == 2
+        assert details[1]["type"] == "refusal"
+        assert details[1]["refusal_ok"] is True
+        assert details[1]["hit"] is True
+
+    def test_fabricated_answer_fails_refusal(self, tmp_path, monkeypatch):
+        # 拒答题编造答案（无拒答标记）→ 拒答失败
+        csv_path = self._write_csv(tmp_path, [
+            "1,校长手机号是多少,陷阱,,学校通知",
+        ])
+        self._patch(tmp_path, monkeypatch, {
+            "校长手机号是多少": {
+                "answer": "校长手机号是13800138000。",
+                "references": [{"title": "某通知", "department": "教务处", "column": "通知"}],
+                "confidence": 0.8,
+            },
+        })
+        rate, mrr, recall_at_k, cite_prec, refusal_rate, details = run_eval("http://x", csv_path)
+        assert refusal_rate == 0.0
+        assert details[0]["refusal_ok"] is False
+        assert details[0]["hit"] is False
+
+    def test_no_refusal_rows_rate_is_none(self, tmp_path, monkeypatch):
+        # 全部为可答题时拒答成功率为 None（不适用）
+        csv_path = self._write_csv(tmp_path, [
+            "1,报修电话是多少,后勤-报修,报修电话,学校通知",
+        ])
+        self._patch(tmp_path, monkeypatch, {
+            "报修电话是多少": {
+                "answer": "报修电话为0756-7626267。（来源：后勤处-报修电话指南）",
+                "references": [{"title": "报修电话指南", "department": "后勤处", "column": "通知"}],
+                "confidence": 0.9,
+            },
+        })
+        rate, mrr, recall_at_k, cite_prec, refusal_rate, details = run_eval("http://x", csv_path)
+        assert rate == 100.0
+        assert refusal_rate is None

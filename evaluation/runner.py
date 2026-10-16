@@ -1,5 +1,10 @@
 """评测运行器：对 questions.csv 每题跑 /ask，输出 Hit Rate / MRR / Recall@K / 引用正确率。
 
+题型约定（100 问 = 60 普通 + 30 拒答 + 10 陷阱）：
+  - 普通/陷阱题：期望答案要点非空，按要点命中判定（陷阱题含错误前提，要点为正确纠正内容）
+  - 拒答题：期望答案要点为空，答案含拒答标记即算拒答成功
+    （库内无相关信息时正确拒答，而非编造；拒答成功不计入 Hit Rate 分母，单独统计拒答成功率）
+
 用法：
   python -m evaluation.runner --api http://127.0.0.1:8000
   python -m evaluation.runner --api http://127.0.0.1:8000 --csv evaluation/questions.csv
@@ -78,6 +83,19 @@ _CITE_PATTERNS = (
     re.compile(r"根据[「『]([^」』]+)[」』]"),
 )
 
+# ── 拒答判定 ──
+# 拒答题（期望要点为空）的正确行为是明确说明库内无相关信息，而非编造。
+# 标记覆盖兜底答案「暂未检索到…建议联系…」与 LLM 说明不足类回答的常见措辞。
+_REFUSAL_MARKS = (
+    "暂未检索到", "未检索到", "未能检索到", "无法回答",
+    "不足以回答", "建议联系", "暂无相关", "抱歉，",
+)
+
+
+def _is_refusal(answer):
+    """判断答案是否为拒答（库内无相关信息时的正确行为）。"""
+    return any(m in answer for m in _REFUSAL_MARKS)
+
 
 def _cited_sources(answer):
     """从答案文本提取被引出处字符串（去重保序）。"""
@@ -153,6 +171,8 @@ def run_eval(api_url, csv_path, recall_k=5):
     recall_sum = 0.0
     cite_total = 0
     cite_ok = 0
+    refusal_total = 0
+    refusal_ok = 0
     details = []
 
     for row in rows:
@@ -183,6 +203,31 @@ def run_eval(api_url, csv_path, recall_k=5):
         data = resp.json()
         refs = data.get("references", [])
         answer = data.get("answer", "")
+
+        # ── 拒答题（期望要点为空）：答案含拒答标记即算拒答成功 ──
+        # 库内无相关信息时正确拒答而非编造；不计入 Hit Rate 分母，单独统计
+        if not expected:
+            refusal_total += 1
+            refused = _is_refusal(answer)
+            if refused:
+                refusal_ok += 1
+            details.append({
+                "id": qid,
+                "question": q,
+                "category": category,
+                "expected": expected,
+                "type": "refusal",
+                "hit": refused,
+                "hit_rank": 0,
+                "mrr": 0.0,
+                "recall_at_k": 0.0,
+                "confidence": data.get("confidence", 0),
+                "top_title": refs[0]["title"] if refs else "",
+                "cite_ok": 0,
+                "cite_total": 0,
+                "refusal_ok": refused,
+            })
+            continue
 
         # ── 逐引用判定命中位置（MRR）──
         points = [k.strip() for k in expected.split("、") if k.strip()] if expected else []
@@ -219,6 +264,7 @@ def run_eval(api_url, csv_path, recall_k=5):
             "question": q,
             "category": category,
             "expected": expected,
+            "type": "normal",
             "hit": hit,
             "hit_rank": first_hit_rank,
             "mrr": round(rr, 4),
@@ -229,16 +275,21 @@ def run_eval(api_url, csv_path, recall_k=5):
             "cite_total": cite[0] if cite is not None else 0,
         })
 
-    rate = hits / total * 100 if total else 0
-    mrr = mrr_sum / total if total else 0
-    recall_at_k = recall_sum / total if total else 0
+    # 指标分母只算可答题（普通+陷阱）；拒答题单独统计拒答成功率
+    answerable = total - refusal_total
+    rate = hits / answerable * 100 if answerable else 0
+    mrr = mrr_sum / answerable if answerable else 0
+    recall_at_k = recall_sum / answerable if answerable else 0
+    refusal_rate = refusal_ok / refusal_total * 100 if refusal_total else None
     cite_prec = cite_ok / cite_total * 100 if cite_total else None
 
     print(f"\n{'='*60}")
-    print(f"评测结果：{hits}/{total} 命中")
+    print(f"评测结果：{hits}/{answerable} 命中（另拒答题 {refusal_ok}/{refusal_total} 正确说明）")
     print(f"  Hit Rate   : {rate:.1f}%")
     print(f"  MRR        : {mrr:.4f}")
     print(f"  Recall@{recall_k}   : {recall_at_k:.4f}")
+    if refusal_rate is not None:
+        print(f"  拒答成功率 : {refusal_rate:.1f}%（{refusal_ok}/{refusal_total} 道无答案题正确说明而非编造）")
     if cite_prec is not None:
         print(f"  引用正确率 : {cite_prec:.1f}%（{cite_ok}/{cite_total} 条引用验证通过）")
     elif title_content is not None:
@@ -249,12 +300,15 @@ def run_eval(api_url, csv_path, recall_k=5):
 
     for d in details:
         mark = "✅" if d.get("hit") else "❌"
-        rank_str = f"r{d['hit_rank']}" if d.get("hit") else "r-"
+        if d.get("type") == "refusal":
+            rank_str = "拒答" if d.get("refusal_ok") else "编造"
+        else:
+            rank_str = f"r{d['hit_rank']}" if d.get("hit") else "r-"
         print(f"  {mark} [{d.get('id', '')}] {d.get('question', '')[:20]} | {d.get('category', '')} "
               f"| {rank_str} | MRR={d.get('mrr', 0):.2f} | R@{recall_k}={d.get('recall_at_k', 0):.2f} "
               f"| {d.get('top_title', '')[:25]}")
 
-    return rate, mrr, recall_at_k, cite_prec, details
+    return rate, mrr, recall_at_k, cite_prec, refusal_rate, details
 
 
 def save_results(rate, mrr, recall_at_k, details, recall_k=5):
@@ -267,6 +321,11 @@ def save_results(rate, mrr, recall_at_k, details, recall_k=5):
     c_total = sum(d.get("cite_total", 0) for d in details)
     c_ok = sum(d.get("cite_ok", 0) for d in details)
 
+    # 拒答成功率：从明细统计（type=refusal 的题）
+    ref_rows = [d for d in details if d.get("type") == "refusal"]
+    r_total = len(ref_rows)
+    r_ok = sum(1 for d in ref_rows if d.get("refusal_ok"))
+
     # JSON 全量明细
     json_path = os.path.join(_RESULTS_DIR, f"eval_{ts}.json")
     payload = {
@@ -277,6 +336,9 @@ def save_results(rate, mrr, recall_at_k, details, recall_k=5):
         "mrr": round(mrr, 4),
         f"recall_at_{recall_k}": round(recall_at_k, 4),
         "citation_precision": round(c_ok / c_total * 100, 1) if c_total else None,
+        "refusal_total": r_total,
+        "refusal_ok": r_ok,
+        "refusal_rate": round(r_ok / r_total * 100, 1) if r_total else None,
         "details": details,
     }
     with open(json_path, "w", encoding="utf-8") as f:
@@ -287,16 +349,18 @@ def save_results(rate, mrr, recall_at_k, details, recall_k=5):
     csv_path = os.path.join(_RESULTS_DIR, f"eval_{ts}.csv")
     with open(csv_path, "w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["id", "question", "category", "hit", "hit_rank",
+        writer.writerow(["id", "question", "category", "type", "hit", "hit_rank",
                          "mrr", f"recall_at_{recall_k}", "confidence", "top_title", "expected",
-                         "cite_ok", "cite_total"])
+                         "cite_ok", "cite_total", "refusal_ok"])
         for d in details:
             writer.writerow([
                 d.get("id", ""), d.get("question", ""), d.get("category", ""),
+                d.get("type", "normal"),
                 d.get("hit", False), d.get("hit_rank", 0),
                 d.get("mrr", 0), d.get("recall_at_k", 0),
                 d.get("confidence", 0), d.get("top_title", ""), d.get("expected", ""),
                 d.get("cite_ok", 0), d.get("cite_total", 0),
+                d.get("refusal_ok", ""),
             ])
     paths.append(csv_path)
 
@@ -317,7 +381,7 @@ def main():
     parser.add_argument("--recall-k", type=int, default=5, help="Recall@K 的 K 值（默认 5）")
     args = parser.parse_args()
 
-    rate, mrr, recall_at_k, cite_prec, details = run_eval(args.api, args.csv, recall_k=args.recall_k)
+    rate, mrr, recall_at_k, cite_prec, refusal_rate, details = run_eval(args.api, args.csv, recall_k=args.recall_k)
     if rate < 85:
         print(f"\n⚠️  当前 Hit Rate {rate:.1f}% < 85% 目标，需优化检索或补充数据")
     else:
@@ -325,6 +389,8 @@ def main():
 
     print(f"   MRR = {mrr:.4f}（越接近 1 越好，1 = 全部 top-1 命中）")
     print(f"   Recall@{args.recall_k} = {recall_at_k:.4f}（越接近 1 越好）")
+    if refusal_rate is not None:
+        print(f"   拒答成功率 = {refusal_rate:.1f}%（无答案题需正确说明而非编造）")
     if cite_prec is not None:
         print(f"   引用正确率 = {cite_prec:.1f}%（被引文档需含期望要点才算验证通过）")
 
