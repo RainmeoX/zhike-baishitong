@@ -148,6 +148,18 @@ class TestIsRefusal:
         # LLM 说明不足类回答
         assert _is_refusal("参考内容不足以回答该问题，建议联系教务处。") is True
 
+    def test_llm_varied_wording_is_refusal(self):
+        # 强化 prompt 后 LLM 的多样化拒答措辞（真实 badcase 回归）
+        assert _is_refusal("暂时没有在提供的参考内容中提及，建议你直接联系后勤处。") is True
+        assert _is_refusal("参考内容中没有明确提到，建议你联系相关部门。") is True
+        # 分离式措辞：关键词被间隔（「没有…提及」「建议…联系」）
+        assert _is_refusal("参考内容中没有明确说明这一点，建议你直接联系相关部门咨询。") is True
+
+    def test_fabricated_answer_not_refusal(self):
+        # 真编造（给出具体数据+假来源）不应被误判为拒答
+        ans = "图书馆借书超期罚款是按照每本书每天0.5元来计算的哦。（来源：后勤处-图书馆借阅规则）"
+        assert _is_refusal(ans) is False
+
     def test_normal_answer_not_refusal(self):
         assert _is_refusal("选课时间为9月1日。（来源：教务处-选课通知）") is False
 

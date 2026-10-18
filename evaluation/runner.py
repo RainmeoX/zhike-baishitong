@@ -86,15 +86,29 @@ _CITE_PATTERNS = (
 # ── 拒答判定 ──
 # 拒答题（期望要点为空）的正确行为是明确说明库内无相关信息，而非编造。
 # 标记覆盖兜底答案「暂未检索到…建议联系…」与 LLM 说明不足类回答的常见措辞。
+# 强化 prompt 后 LLM 实际使用分离式措辞（「没有在提供的参考内容中提及」「建议你直接联系」），
+# 故另配正则覆盖「没有…提及」「建议…联系」的间隔变体。
 _REFUSAL_MARKS = (
     "暂未检索到", "未检索到", "未能检索到", "无法回答",
     "不足以回答", "建议联系", "暂无相关", "抱歉，",
+    "未提及", "没有提及", "未明确提到", "没有明确提到",
+    "未找到", "没有找到", "没有具体说明", "未具体说明",
+)
+
+# 分离式措辞的正则覆盖（真实 badcase 回归）
+_REFUSAL_PATTERNS = (
+    re.compile(r"没有[^。！？]{0,12}提及"),
+    re.compile(r"建议[^。！？]{0,6}联系"),
 )
 
 
 def _is_refusal(answer):
     """判断答案是否为拒答（库内无相关信息时的正确行为）。"""
-    return any(m in answer for m in _REFUSAL_MARKS)
+    if not answer:
+        return False
+    if any(m in answer for m in _REFUSAL_MARKS):
+        return True
+    return any(p.search(answer) for p in _REFUSAL_PATTERNS)
 
 
 def _cited_sources(answer):
