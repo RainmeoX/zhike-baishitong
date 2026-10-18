@@ -2,9 +2,12 @@
 
 import json
 
+from api.log import get_logger
 from crawler.config import CLEAN_DIR
 from crawler.cleaner import clean_text
 from retrieval.db import get_conn, init_db, DB_PATH
+
+logger = get_logger(__name__)
 
 
 def build_index(clean_dir=None):
@@ -15,6 +18,7 @@ def build_index(clean_dir=None):
 
     existing = {r[0] for r in cur.execute("SELECT doc_id FROM documents")}
     inserted = 0
+    skipped_empty = 0  # 空内容文档跳过计数（图片/表格页，正文为空无法支撑问答与引用）
 
     for jsonl in sorted(clean_dir.glob("*.jsonl")):
         for line in jsonl.read_text(encoding="utf-8").splitlines():
@@ -26,6 +30,10 @@ def build_index(clean_dir=None):
                 continue
             title = clean_text(rec.get("title", ""))
             content = clean_text(rec.get("content", ""))
+            # 空内容文档不入库：正文为空既无法支撑生成，也是关键词假阳性的主要来源
+            if not content.strip():
+                skipped_empty += 1
+                continue
             dept = rec.get("department", "")
             column = rec.get("column", "")
             url = rec.get("source_url", "")
@@ -47,4 +55,11 @@ def build_index(clean_dir=None):
 
     conn.commit()
     conn.close()
+    if skipped_empty:
+        logger.info("跳过 %d 篇空内容文档（图片/表格页，正文为空）", skipped_empty)
     return inserted
+
+
+if __name__ == "__main__":
+    n = build_index()
+    print(f"入库完成：新增 {n} 篇文档 → {DB_PATH}")
