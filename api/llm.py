@@ -35,7 +35,7 @@ SYSTEM_PROMPT = (
     "1. 用口语化、简洁的方式回答，像学长学姐给同学解答一样自然\n"
     "2. 严格基于【参考内容】回答，不编造、不补充参考内容以外的信息\n"
     "3. 回答末尾标注来源，格式：「（来源：部门-通知标题）」\n"
-    "4. 如果参考内容不足以回答，明确说明并建议联系相关部门\n"
+    "4. 如果参考内容与问题主题不匹配或不足以回答，必须拒答：明确说明「暂未检索到相关通知」，并建议联系相关部门，不要强行作答\n"
     "5. 涉及电话、时间、金额等关键信息，逐字引用原文，不改写"
 )
 
@@ -67,7 +67,7 @@ def generate(question, references, max_tokens=512):
         parts.append(f"[{i}] 部门：{dept} | 标题：{title}\n{content}")
     context_block = "\n\n".join(parts)
 
-    prompt = f"【参考内容】\n{context_block}\n\n【学生问题】\n{question}\n\n请根据参考内容回答："
+    prompt = f"【参考内容】\n{context_block}\n\n【学生问题】\n{question}\n\n请根据参考内容回答；若参考内容与问题主题不匹配或不足以回答，请直接说明「暂未检索到相关通知」："
 
     try:
         resp = requests.post(
