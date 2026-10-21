@@ -22,6 +22,18 @@ CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
     title, content, department, column_name,
     doc_id UNINDEXED, source_url UNINDEXED, publish_time UNINDEXED
 );
+
+CREATE TABLE IF NOT EXISTS query_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question TEXT NOT NULL,
+    hit_doc_id TEXT,
+    created_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS admin_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
 """
 
 

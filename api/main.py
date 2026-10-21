@@ -13,10 +13,13 @@ from retrieval.search import search as keyword_search, _extract_keywords
 from retrieval.hybrid import hybrid_search
 from retrieval.db import get_conn
 from api.llm import generate as llm_generate, is_available as llm_available
+from api.admin import router as admin_router
 
 app = FastAPI(title="珠科百事通", description="珠科校务生活 RAG 问答接口")
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+app.include_router(admin_router)
 
 _WEB = Path(__file__).resolve().parent.parent / "web"
 
@@ -129,4 +132,18 @@ def ask(req: AskRequest):
         )
         for r in results
     ]
+
+    # 埋点：记录问句与命中首条文档，供管理后台热门统计使用（失败不影响回答）
+    try:
+        from datetime import datetime
+        conn = get_conn()
+        conn.execute(
+            "INSERT INTO query_log(question, hit_doc_id, created_at) VALUES(?,?,?)",
+            (req.question, results[0]["doc_id"], datetime.now().isoformat(timespec="seconds")),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
     return AskResponse(answer=answer, confidence=confidence, references=references)
