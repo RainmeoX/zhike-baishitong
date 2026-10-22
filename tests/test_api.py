@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 from pydantic import ValidationError
-from api.main import _extract_snippet, AskRequest
+from api.main import _extract_snippet, _calc_confidence, _is_refusal_answer, AskRequest
 
 
 class TestExtractSnippet:
@@ -84,3 +84,56 @@ class TestAskRequestValidation:
         req2 = AskRequest(question="选课", topk=20)
         assert req1.topk == 1
         assert req2.topk == 20
+
+
+class TestConfidence:
+    """置信度归一化：精排分映射，修复旧实现恒 100% 的问题。"""
+
+    def test_high_rerank_score(self):
+        assert _calc_confidence({"rerank_score": 0.9, "final_score": 0.8}) == 0.9
+
+    def test_capped_at_095(self):
+        # rerank 分异常高（>1）也封顶 0.95，不再出现 1.0
+        assert _calc_confidence({"rerank_score": 2.0}) == 0.95
+        assert _calc_confidence({"rerank_score": 16}) == 0.95  # 旧 bug 的粗排分误入也不恒 1.0
+
+    def test_fallback_to_final_score(self):
+        # rerank 服务失败时无 rerank_score，回退 final_score
+        assert _calc_confidence({"final_score": 0.6, "score": 16}) == 0.6
+
+    def test_floor_at_005(self):
+        assert _calc_confidence({}) == 0.05
+        assert _calc_confidence({"rerank_score": 0}) == 0.05
+
+    def test_weak_relevance_low_confidence(self):
+        # 弱相关（超纲题常见）分低 → 置信度明显低于正常题，形成区分度
+        assert _calc_confidence({"rerank_score": 0.2}) == 0.2
+
+
+class TestRefusalDetection:
+    """LLM 拒答判定：严格关键词，须拦截"个人知识"式泄漏且不误伤正常回答。"""
+
+    def test_standard_refusal(self):
+        assert _is_refusal_answer("暂未检索到相关通知。") is True
+        assert _is_refusal_answer("抱歉，知识库中未找到相关信息。") is True
+        assert _is_refusal_answer("参考内容不足以回答该问题。") is True
+
+    def test_separated_wording(self):
+        # LLM 分离式措辞："没有…提及"间隔变体
+        assert _is_refusal_answer("没有在提供的参考内容中提及相关安排。") is True
+        assert _is_refusal_answer("参考通知里没有明确提到报名费标准。") is True
+
+    def test_normal_answer_not_refused(self):
+        # 正常回答含"建议联系/致电"等字样，不得误判为拒答
+        assert _is_refusal_answer(
+            "空调报修可联系宿管处，建议拨打后勤处电话 7626267。"
+            "（来源：后勤处-通知）"
+        ) is False
+        assert _is_refusal_answer(
+            "四六级报名时间为9月15日至9月19日，记得按时缴费。"
+            "（来源：教务处-关于开展2026年下半年全国大学英语四、六级考试报名工作的通知）"
+        ) is False
+
+    def test_empty_text(self):
+        assert _is_refusal_answer("") is False
+        assert _is_refusal_answer(None) is False
