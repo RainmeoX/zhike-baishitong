@@ -5,13 +5,13 @@
       <icon type="search" size="18" color="#999" />
       <input
         class="search-input"
-        placeholder="搜索校务问题，如"报修电话""
+        placeholder="搜索校务问题，如「报修电话」"
         value="{{inputValue}}"
         bindinput="onInput"
         confirm-type="search"
         bindconfirm="onSearch"
       />
-      <view wx:if="{{inputValue}}" class="clear-btn" catchtap="onClearInput">
+      <view wx:if="{{inputValue}}" class="clear-btn" bindtap="onInput">
         <icon type="clear" size="16" color="#999" />
       </view>
     </view>

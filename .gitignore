@@ -23,6 +23,9 @@ Thumbs.db
 config.local.*
 opencode.json
 
+# 微信开发者工具个人私有配置
+project.private.config.json
+
 # 智能体会话目录（不入库）
 .codeartsdoer/
 

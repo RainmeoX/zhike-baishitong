@@ -44,15 +44,21 @@
     "useBabel": true,
     "useMinifiedWXSS": true,
     "preloadSubmitTime": 0,
-    "isUploadLargeProgram": false
+    "isUploadLargeProgram": false,
+    "compileWorklet": false,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "useCompilerPlugins": false,
+    "condition": false
   },
   "compileType": "miniprogram",
   "libVersion": "3.5.0",
-  "appid": "touristappid",
+  "appid": "wx6fbf286128239189",
   "projectname": "zhike-baishitong",
   "condition": {},
   "editorSetting": {
     "tabIndent": "insertSpaces",
     "tabSize": 2
-  }
+  },
+  "simulatorPluginLibVersion": {}
 }

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>珠科百事通 · 管理后台</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "微软雅黑", "Microsoft YaHei", sans-serif; background: #F5F7FA; color: #212121; min-height: 100vh; }
+  header { background: #37474F; color: #fff; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 17px; font-weight: 600; }
+  header .logout { font-size: 13px; color: #CFD8DC; cursor: pointer; }
+  header .logout:hover { color: #fff; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 16px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tab { padding: 9px 18px; background: #fff; border: 1px solid #E0E0E0; border-radius: 8px; font-size: 14px; cursor: pointer; color: #616161; }
+  .tab.active { background: #1565C0; color: #fff; border-color: #1565C0; }
+  .cards { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .card { background: #fff; border: 1px solid #E0E0E0; border-radius: 10px; padding: 14px 18px; flex: 1; min-width: 150px; }
+  .card .n { font-size: 26px; font-weight: 700; color: #1565C0; }
+  .card .l { font-size: 12px; color: #9E9E9E; margin-top: 4px; }
+  .panel { background: #fff; border: 1px solid #E0E0E0; border-radius: 10px; padding: 16px; }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  input, select { padding: 9px 12px; border: 1px solid #E0E0E0; border-radius: 8px; font-size: 14px; outline: none; }
+  input:focus, select:focus { border-color: #1565C0; }
+  input[type=text] { flex: 1; min-width: 180px; }
+  button { padding: 9px 18px; background: #1565C0; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
+  button:disabled { background: #90CAF9; cursor: wait; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid #F0F0F0; }
+  th { color: #616161; font-weight: 600; background: #FAFAFA; }
+  tr:hover td { background: #F5F9FF; }
+  td a { color: #1565C0; text-decoration: none; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 10px; background: #E3F2FD; color: #1565C0; font-size: 12px; margin-right: 4px; }
+  .muted { color: #9E9E9E; font-size: 12px; }
+  .empty { color: #9E9E9E; text-align: center; padding: 30px; }
+  .err { color: #C62828; font-size: 13px; margin: 10px 0; }
+  .pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 12px; font-size: 13px; color: #616161; }
+  .pager button { padding: 6px 12px; }
+  .login-box { max-width: 360px; margin: 80px auto; background: #fff; border: 1px solid #E0E0E0; border-radius: 12px; padding: 28px; }
+  .login-box h2 { font-size: 18px; margin-bottom: 4px; }
+  .login-box .sub { font-size: 12px; color: #9E9E9E; margin-bottom: 18px; }
+  .login-box input { width: 100%; margin-bottom: 12px; }
+  .login-box button { width: 100%; }
+  .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 99; }
+  .modal { background: #fff; border-radius: 12px; padding: 26px; width: 340px; }
+  .modal h2 { font-size: 17px; margin-bottom: 16px; }
+  .modal input { width: 100%; margin-bottom: 12px; }
+  .modal .row { display: flex; gap: 8px; }
+  .modal .row button { flex: 1; }
+  .modal .cancel { background: #ECEFF1; color: #455A64; }
+  .bar { height: 8px; background: #E8E8E8; border-radius: 4px; overflow: hidden; margin: 6px 0 2px; }
+  .bar-fill { height: 100%; background: #1565C0; }
+  .hit { outline: 2px solid #2E7D32; background: #F1F8E9 !important; }
+  .doc-body { white-space: pre-wrap; font-size: 14px; line-height: 1.8; background: #FAFAFA; border-radius: 8px; padding: 14px; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>珠科百事通 · 管理后台</h1>
+  <div>
+    <span class="logout" id="changePwd" style="display:none; margin-right:16px">修改密码</span>
+    <span class="logout" id="logout" style="display:none">登出</span>
+  </div>
+</header>
+
+<!-- 登录 -->
+<div class="login-box" id="loginBox">
+  <h2>管理员登录</h2>
+  <div class="sub">RAGGO!!!!! ｜ 知识源管理 / 质量抽查 / 热门统计</div>
+  <input id="username" placeholder="用户名" autocomplete="username">
+  <input id="password" type="password" placeholder="密码" autocomplete="current-password">
+  <div class="err" id="loginErr" style="display:none"></div>
+  <button id="loginBtn">登 录</button>
+</div>
+
+<!-- 主界面 -->
+<div class="wrap" id="main" style="display:none">
+  <div class="tabs">
+    <div class="tab active" data-tab="docs">知识源</div>
+    <div class="tab" data-tab="spot">质量抽查</div>
+    <div class="tab" data-tab="hot">热门统计</div>
+  </div>
+
+  <div class="cards" id="overview"></div>
+
+  <!-- 知识源 -->
+  <div class="panel" id="panel-docs">
+    <div class="toolbar">
+      <input type="text" id="q" placeholder="搜索标题/正文…">
+      <select id="dept">
+        <option value="">全部部门</option>
+        <option>教务处</option><option>后勤处</option><option>招生办</option>
+      </select>
+      <select id="col">
+        <option value="">全部栏目</option>
+        <option>通知公告</option><option>考试信息</option><option>选课管理</option>
+        <option>学籍管理</option><option>规章制度-校级文件</option><option>服务指南</option>
+        <option>后勤服务</option><option>规章制度</option>
+      </select>
+      <button id="searchBtn">查询</button>
+    </div>
+    <table>
+      <thead><tr><th>标题</th><th>部门</th><th>栏目</th><th>发布时间</th><th></th></tr></thead>
+      <tbody id="docsBody"></tbody>
+    </table>
+    <div class="pager">
+      <span id="docsCount"></span>
+      <button id="prevBtn">上一页</button>
+      <button id="nextBtn">下一页</button>
+    </div>
+    <div id="docDetail" style="display:none; margin-top:14px; border-top:1px solid #F0F0F0; padding-top:14px">
+      <h3 id="docDetailTitle" style="font-size:15px; margin-bottom:6px"></h3>
+      <div class="muted" id="docDetailMeta"></div>
+      <div class="doc-body" id="docDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- 质量抽查 -->
+  <div class="panel" id="panel-spot" style="display:none">
+    <div class="toolbar">
+      <input type="text" id="spotQ" placeholder="输入问题，例如：四六级什么时候报名">
+      <button id="spotBtn">抽查</button>
+    </div>
+    <div class="toolbar">
+      <input type="text" id="targetDoc" placeholder="目标文档 doc_id（可选，用于高亮比对命中位置）">
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>标题</th><th>部门</th><th>匹配分</th><th>命中路</th></tr></thead>
+      <tbody id="spotBody"></tbody>
+    </table>
+  </div>
+
+  <!-- 热门统计 -->
+  <div class="panel" id="panel-hot" style="display:none">
+    <table>
+      <thead><tr><th>#</th><th>问题</th><th>被问次数</th><th>最近提问</th></tr></thead>
+      <tbody id="hotBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 修改密码弹窗 -->
+<div class="modal-mask" id="pwdMask" style="display:none">
+  <div class="modal">
+    <h2>修改密码</h2>
+    <input type="password" id="oldPwd" placeholder="旧密码">
+    <input type="password" id="newPwd" placeholder="新密码（至少 6 位）">
+    <input type="password" id="newPwd2" placeholder="确认新密码">
+    <div class="err" id="pwdErr" style="display:none"></div>
+    <div class="row">
+      <button class="cancel" id="pwdCancel">取消</button>
+      <button id="pwdOk">确 认</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let token = localStorage.getItem('admin_token') || '';
+let page = 1, size = 20;
+
+function esc(s) { return String(s ?? '').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, ...(opts.headers || {}) }
+  });
+  if (res.status === 401) { showLogin(); throw new Error('登录已失效'); }
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(d.detail || ('HTTP ' + res.status));
+  return d;
+}
+
+function showLogin() {
+  document.getElementById('main').style.display = 'none';
+  document.getElementById('loginBox').style.display = 'block';
+  document.getElementById('logout').style.display = 'none';
+  document.getElementById('changePwd').style.display = 'none';
+  token = ''; localStorage.removeItem('admin_token');
+}
+function showMain() {
+  document.getElementById('loginBox').style.display = 'none';
+  document.getElementById('main').style.display = 'block';
+  document.getElementById('logout').style.display = 'inline';
+  document.getElementById('changePwd').style.display = 'inline';
+}
+
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value;
+  const err = document.getElementById('loginErr');
+  err.style.display = 'none';
+  try {
+    const r = await fetch('/admin/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
+    });
+    const d = await r.json();
+    if (!r.ok) { err.textContent = d.detail || '登录失败'; err.style.display = 'block'; return; }
+    token = d.token; localStorage.setItem('admin_token', token);
+    showMain(); loadAll();
+  } catch (e) { err.textContent = e.message; err.style.display = 'block'; }
+});
+document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('loginBtn').click(); });
+document.getElementById('logout').addEventListener('click', showLogin);
+
+// 修改密码
+const pwdMask = document.getElementById('pwdMask');
+document.getElementById('changePwd').addEventListener('click', () => {
+  document.getElementById('oldPwd').value = '';
+  document.getElementById('newPwd').value = '';
+  document.getElementById('newPwd2').value = '';
+  document.getElementById('pwdErr').style.display = 'none';
+  pwdMask.style.display = 'flex';
+});
+document.getElementById('pwdCancel').addEventListener('click', () => { pwdMask.style.display = 'none'; });
+document.getElementById('pwdOk').addEventListener('click', async () => {
+  const oldPwd = document.getElementById('oldPwd').value;
+  const newPwd = document.getElementById('newPwd').value;
+  const newPwd2 = document.getElementById('newPwd2').value;
+  const err = document.getElementById('pwdErr');
+  err.style.display = 'none';
+  if (newPwd.length < 6) { err.textContent = '新密码至少 6 位'; err.style.display = 'block'; return; }
+  if (newPwd !== newPwd2) { err.textContent = '两次输入的新密码不一致'; err.style.display = 'block'; return; }
+  try {
+    await api('/admin/change-password', { method: 'POST', body: JSON.stringify({ old_password: oldPwd, new_password: newPwd }) });
+    alert('密码已修改，请重新登录');
+    pwdMask.style.display = 'none';
+    showLogin();
+  } catch (e) { err.textContent = e.message; err.style.display = 'block'; }
+});
+
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  const k = t.dataset.tab;
+  ['docs','spot','hot'].forEach(n => document.getElementById('panel-' + n).style.display = (n === k ? 'block' : 'none'));
+  if (k === 'docs') loadDocs();
+  if (k === 'spot') {}
+  if (k === 'hot') loadHot();
+}));
+
+async function loadOverview() {
+  try {
+    const d = await api('/admin/stats/overview');
+    const dept = (d.departments || []).map(x => `<span class="tag">${esc(x.department)} ${x.cnt}</span>`).join('');
+    document.getElementById('overview').innerHTML =
+      card(d.documents_total, '知识源文档') + card(d.queries_total, '累计问答') + card(d.queries_today, '今日问答');
+    if (dept) {
+      const c = document.createElement('div'); c.className = 'card'; c.innerHTML = `<div class="n" style="font-size:14px">${dept}</div><div class="l">部门分布</div>`;
+      document.getElementById('overview').appendChild(c);
+    }
+  } catch (e) {}
+}
+function card(n, l) { return `<div class="card"><div class="n">${n}</div><div class="l">${l}</div></div>`; }
+
+async function loadDocs() {
+  const q = document.getElementById('q').value.trim();
+  const dept = document.getElementById('dept').value;
+  const col = document.getElementById('col').value;
+  const params = new URLSearchParams({ page, size, q, department: dept, column: col });
+  try {
+    const d = await api('/admin/documents?' + params);
+    document.getElementById('docsCount').textContent = `共 ${d.total} 条，第 ${d.page} 页`;
+    document.getElementById('prevBtn').disabled = page <= 1;
+    document.getElementById('nextBtn').disabled = page * size >= d.total;
+    const body = document.getElementById('docsBody');
+    if (!d.items.length) { body.innerHTML = '<tr><td colspan="5" class="empty">无匹配结果</td></tr>'; return; }
+    body.innerHTML = d.items.map(it =>
+      `<tr><td>${esc(it.title)}</td><td><span class="tag">${esc(it.department)}</span></td><td>${esc(it.column_name)}</td><td class="muted">${esc(it.publish_time)}</td><td><a href="#" data-id="${esc(it.doc_id)}">查看</a></td></tr>`
+    ).join('');
+    body.querySelectorAll('a').forEach(a => a.addEventListener('click', e => { e.preventDefault(); loadDocDetail(a.dataset.id); }));
+  } catch (e) { document.getElementById('docsBody').innerHTML = `<tr><td colspan="5" class="err">${esc(e.message)}</td></tr>`; }
+}
+async function loadDocDetail(id) {
+  try {
+    const d = await api('/admin/documents/' + encodeURIComponent(id));
+    const box = document.getElementById('docDetail');
+    box.style.display = 'block';
+    document.getElementById('docDetailTitle').textContent = d.title;
+    document.getElementById('docDetailMeta').textContent = `${d.department} · ${d.column_name} · ${d.publish_time} · ${d.source_url}`;
+    document.getElementById('docDetailBody').textContent = d.content || '（空）';
+  } catch (e) { document.getElementById('docDetail').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+document.getElementById('searchBtn').addEventListener('click', () => { page = 1; loadDocs(); });
+document.getElementById('prevBtn').addEventListener('click', () => { page--; loadDocs(); });
+document.getElementById('nextBtn').addEventListener('click', () => { page++; loadDocs(); });
+
+document.getElementById('spotBtn').addEventListener('click', async () => {
+  const q = document.getElementById('spotQ').value.trim();
+  if (!q) return;
+  const target = document.getElementById('targetDoc').value.trim();
+  const btn = document.getElementById('spotBtn'); btn.disabled = true;
+  const body = document.getElementById('spotBody');
+  body.innerHTML = '<tr><td colspan="5" class="empty">检索中…</td></tr>';
+  try {
+    const d = await api('/admin/spotcheck', { method: 'POST', body: JSON.stringify({ question: q, topk: 10 }) });
+    const rs = d.results || [];
+    if (!rs.length) { body.innerHTML = '<tr><td colspan="5" class="empty">无命中</td></tr>'; return; }
+    body.innerHTML = rs.map((r, i) =>
+      `<tr class="${target && String(r.doc_id) === target ? 'hit' : ''}">` +
+      `<td>${i + 1}</td><td>${esc(r.title)}</td><td><span class="tag">${esc(r.department)}</span></td>` +
+      `<td>${r.final_score ?? r.score ?? '-'}</td><td class="muted">${esc(r.routes || '')}</td></tr>`
+    ).join('');
+  } catch (e) { body.innerHTML = `<tr><td colspan="5" class="err">${esc(e.message)}</td></tr>`; }
+  btn.disabled = false;
+});
+document.getElementById('spotQ').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('spotBtn').click(); });
+
+async function loadHot() {
+  try {
+    const d = await api('/admin/stats/hot?limit=20');
+    const body = document.getElementById('hotBody');
+    if (!d.items.length) { body.innerHTML = '<tr><td colspan="4" class="empty">暂无问答记录（先在前端/测试台问几题）</td></tr>'; return; }
+    body.innerHTML = d.items.map((it, i) =>
+      `<tr><td>${i + 1}</td><td>${esc(it.question)}</td><td>${it.cnt}</td><td class="muted">${esc(it.last_at)}</td></tr>`
+    ).join('');
+  } catch (e) { document.getElementById('hotBody').innerHTML = `<tr><td colspan="4" class="err">${esc(e.message)}</td></tr>`; }
+}
+
+function loadAll() { loadOverview(); loadDocs(); loadHot(); }
+
+if (token) { showMain(); loadAll(); }
+</script>
+</body>
+</html>
