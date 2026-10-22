@@ -32,3 +32,6 @@ project.private.config.json
 
 # 打包产物（不入库）
 submission/output/
+
+# 前端/PPT 工具依赖（PPT 生成用 pptxgenjs，产物已提交，依赖本体不入库）
+node_modules/
