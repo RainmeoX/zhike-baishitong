@@ -172,6 +172,38 @@ def build_submission(group: str, phone: str, output_dir: Path) -> Path:
         total_files += n
         print(f"  readme/ → {n} 文件")
 
+    # 5. 复制 codearts_proof/（码道使用证明）
+    proof_src = PROJECT_ROOT / "submission" / "codearts_proof"
+    proof_dst = staging / "codearts_proof"
+    if proof_src.exists():
+        n = copy_tree(proof_src, proof_dst)
+        total_files += n
+        print(f"  codearts_proof/ → {n} 文件")
+    else:
+        proof_dst.mkdir(parents=True, exist_ok=True)
+        print("  codearts_proof/ → 空目录（待补充）")
+
+    # 6. 复制 ppt/ 和 video/（有则复制，无则占位）
+    ppt_src = PROJECT_ROOT / "ppt"
+    ppt_dir = staging / "ppt"
+    if ppt_src.exists():
+        n = copy_tree(ppt_src, ppt_dir)
+        total_files += n
+        print(f"  ppt/ → {n} 文件")
+    else:
+        ppt_dir.mkdir(parents=True, exist_ok=True)
+        print("  ppt/ → 占位（待补充）")
+
+    video_src = PROJECT_ROOT / "video"
+    video_dir = staging / "video"
+    if video_src.exists():
+        n = copy_tree(video_src, video_dir)
+        total_files += n
+        print(f"  video/ → {n} 文件")
+    else:
+        video_dir.mkdir(parents=True, exist_ok=True)
+        print("  video/ → 占位（待补充）")
+
     # 生成打包清单
     manifest = staging / "打包清单.txt"
     manifest.write_text(
