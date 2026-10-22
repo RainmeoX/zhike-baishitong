@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>珠科百事通 · 通知速览</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="bg"><div class="bg-img"></div><div class="grid-deco"></div></div>
+<button class="sidebar-toggle" aria-label="菜单">≡</button>
+
+<!-- 侧边栏 -->
+<nav class="topnav">
+  <a class="tn-logo" href="index.html">
+    <img class="tn-logo-img" src="/static/img/logo-bai.png" alt="珠海科技学院">
+    <span class="tn-divider"></span>
+    <span class="tn-brand">珠科百事通</span>
+  </a>
+  <div class="tn-links">
+    <a class="item" href="index.html">首页概览</a>
+    <a class="item" href="chat.html">智能问答</a>
+    <a class="item" href="notices.html">通知速览</a>
+    <a class="item" href="about.html">关于项目</a>
+  </div>
+  <a class="tn-git" href="https://gitcode.com/ZSIOM/zhike-baishitong" target="_blank">GitCode</a>
+  <a class="tn-admin" href="/admin">管理后台</a>
+</nav>
+
+<!-- 主内容 -->
+<div class="main">
+  <div class="content">
+    <h3 class="section-title">通知速览</h3>
+
+    <!-- 筛选栏 -->
+    <div class="toolbar">
+      <input type="text" id="q" placeholder="搜索标题/正文…">
+      <select id="dept">
+        <option value="">全部部门</option>
+        <option>教务处</option><option>后勤处</option>
+        <option>招生办</option><option>图书馆</option>
+      </select>
+      <select id="col">
+        <option value="">全部栏目</option>
+        <option>通知公告</option><option>考试信息</option><option>选课管理</option>
+        <option>学籍管理</option><option>规章制度-校级文件</option><option>服务指南</option>
+        <option>后勤服务</option><option>规章制度</option>
+      </select>
+      <button class="btn" id="searchBtn">查询</button>
+    </div>
+
+    <!-- 通知列表 -->
+    <div id="list">
+      <div class="empty">加载中…</div>
+    </div>
+
+    <!-- 分页 -->
+    <div class="pager" id="pager" style="display:none">
+      <span id="count"></span>
+      <button class="btn btn-outline" id="prevBtn">上一页</button>
+      <button class="btn btn-outline" id="nextBtn">下一页</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+var page = 1;
+var size = 20;
+
+// 从 URL 参数读取预设部门
+var initParams = new URLSearchParams(location.search);
+if (initParams.get('dept')) {
+  document.getElementById('dept').value = initParams.get('dept');
+}
+
+async function loadList() {
+  var list = document.getElementById('list');
+  list.innerHTML = '<div class="empty">加载中…</div>';
+  var q = document.getElementById('q').value.trim();
+  var dept = document.getElementById('dept').value;
+  var col = document.getElementById('col').value;
+  var params = new URLSearchParams({ page: page, size: size, q: q, department: dept, column: col });
+  try {
+    var d = await apiGet('/api/notices?' + params);
+    var pager = document.getElementById('pager');
+    if (!d.total) {
+      list.innerHTML = '<div class="empty">暂无匹配结果</div>';
+      pager.style.display = 'none';
+      return;
+    }
+    pager.style.display = 'flex';
+    document.getElementById('count').textContent = '共 ' + d.total + ' 条，第 ' + d.page + ' 页';
+    document.getElementById('prevBtn').disabled = page <= 1;
+    document.getElementById('nextBtn').disabled = page * size >= d.total;
+
+    list.innerHTML = d.items.map(function (it) {
+      var st = noticeStatus(it.publish_time, it.title);
+      return '<div class="notice-card reveal" data-id="' + escapeHtml(it.doc_id) + '">' +
+        '<div class="nc-title">' + escapeHtml(it.title) +
+          '<span class="st-tag ' + st.cls + '">' + st.label + '</span></div>' +
+        '<div class="nc-meta">' +
+          '<span class="tag">' + escapeHtml(it.department) + '</span>' +
+          '<span class="tag">' + escapeHtml(it.column_name) + '</span>' +
+          formatDate(it.publish_time) +
+        '</div>' +
+        '<div class="nc-summary">加载中…</div>' +
+      '</div>';
+    }).join('');
+
+    // 点击标题展开摘要
+    list.querySelectorAll('.notice-card').forEach(function (card) {
+      card.querySelector('.nc-title').addEventListener('click', function () {
+        if (card.classList.contains('expanded')) { card.classList.remove('expanded'); return; }
+        card.classList.add('expanded');
+        var sum = card.querySelector('.nc-summary');
+        if (sum.dataset.loaded) return;
+        apiGet('/api/notices/' + encodeURIComponent(card.dataset.id)).then(function (doc) {
+          var c = (doc.content || '').slice(0, 300);
+          sum.innerHTML = escapeHtml(c) + (doc.content && doc.content.length > 300 ? '…' : '') +
+            '<br><a href="' + escapeHtml(doc.source_url) + '" target="_blank" style="color:#1565C0; font-size:13px;">查看原文 →</a>';
+          sum.dataset.loaded = '1';
+        }).catch(function () { sum.textContent = '加载失败'; });
+      });
+    });
+
+    // reveal 动画
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) { entry.target.classList.add('in'); io.unobserve(entry.target); }
+        });
+      }, { threshold: 0.1 });
+      list.querySelectorAll('.reveal').forEach(function (el, i) {
+        el.style.animationDelay = (i * 60) + 'ms';
+        io.observe(el);
+      });
+    } else {
+      list.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('in'); });
+    }
+  } catch (e) {
+    list.innerHTML = '<div class="err">加载失败：' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+document.getElementById('searchBtn').addEventListener('click', function () { page = 1; loadList(); });
+document.getElementById('prevBtn').addEventListener('click', function () { page--; loadList(); });
+document.getElementById('nextBtn').addEventListener('click', function () { page++; loadList(); });
+document.getElementById('q').addEventListener('keydown', function (e) { if (e.key === 'Enter') { page = 1; loadList(); } });
+
+loadList();
+</script>
+</body>
+</html>

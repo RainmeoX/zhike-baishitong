@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>珠科百事通 · 智能问答</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="bg"><div class="bg-img"></div><div class="grid-deco"></div></div>
+<button class="sidebar-toggle" aria-label="菜单">≡</button>
+
+<!-- 侧边栏 -->
+<nav class="topnav">
+  <a class="tn-logo" href="index.html">
+    <img class="tn-logo-img" src="/static/img/logo-bai.png" alt="珠海科技学院">
+    <span class="tn-divider"></span>
+    <span class="tn-brand">珠科百事通</span>
+  </a>
+  <div class="tn-links">
+    <a class="item" href="index.html">首页概览</a>
+    <a class="item" href="chat.html">智能问答</a>
+    <a class="item" href="notices.html">通知速览</a>
+    <a class="item" href="about.html">关于项目</a>
+  </div>
+  <a class="tn-git" href="https://gitcode.com/ZSIOM/zhike-baishitong" target="_blank">GitCode</a>
+  <a class="tn-admin" href="/admin">管理后台</a>
+</nav>
+
+<!-- 主内容 -->
+<div class="main">
+  <div class="content">
+    <h3 class="section-title">智能问答</h3>
+
+    <!-- 对话区 -->
+    <div class="chat-log" id="log">
+      <div class="empty" id="welcome">
+        <div style="font-size:16px; color:#9e2438; font-weight:700; margin-bottom:8px;">问问珠科的任何校务问题</div>
+        <div style="margin-bottom:18px;">选课报名、报修电话、校巴时刻、奖助政策 —— 直接问，答案附官方通知原文</div>
+        <div class="examples">
+          <div class="example" onclick="quickAsk('四六级考试什么时候报名')">四六级考试什么时候报名</div>
+          <div class="example" onclick="quickAsk('宿舍空调坏了怎么报修')">宿舍空调坏了怎么报修</div>
+          <div class="example" onclick="quickAsk('校园巴士几点发车')">校园巴士几点发车</div>
+          <div class="example" onclick="quickAsk('怎么申请转专业')">怎么申请转专业</div>
+          <div class="example" onclick="quickAsk('有哪些奖学金助学金')">有哪些奖学金助学金</div>
+          <div class="example" onclick="quickAsk('食堂就餐有什么规定')">食堂就餐有什么规定</div>
+        </div>
+        <div class="hotline">
+          <span class="hotline-label">官方咨询</span>
+          招生办 0756-7626272 · 党政办 0756-7626292
+        </div>
+      </div>
+    </div>
+
+    <!-- 输入栏 -->
+    <form class="chat-form" onsubmit="return ask(event)">
+      <input id="q" placeholder="输入你的问题…" autocomplete="off" required>
+      <button class="btn" id="btn" type="submit">提问</button>
+      <button class="btn btn-outline" id="clearBtn" type="button">清空历史</button>
+    </form>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+// 从 localStorage 恢复历史
+var HISTORY_KEY = 'chat_history';
+
+function saveHistory(item) {
+  try {
+    var arr = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    arr.push(item);
+    if (arr.length > 50) arr = arr.slice(-50);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(arr));
+  } catch (e) {}
+}
+
+function clearHistory() {
+  localStorage.removeItem(HISTORY_KEY);
+  document.getElementById('log').innerHTML = '';
+  showWelcome();
+}
+
+function showWelcome() {
+  var log = document.getElementById('log');
+  log.innerHTML = '<div class="empty" id="welcome">' +
+    '<div style="font-size:16px; color:#9e2438; font-weight:700; margin-bottom:8px;">问问珠科的任何校务问题</div>' +
+    '<div style="margin-bottom:18px;">选课报名、报修电话、校巴时刻、奖助政策 —— 直接问，答案附官方通知原文</div>' +
+    '<div class="examples">' +
+    '<div class="example" onclick="quickAsk(\'四六级考试什么时候报名\')">四六级考试什么时候报名</div>' +
+    '<div class="example" onclick="quickAsk(\'宿舍空调坏了怎么报修\')">宿舍空调坏了怎么报修</div>' +
+    '<div class="example" onclick="quickAsk(\'校园巴士几点发车\')">校园巴士几点发车</div>' +
+    '<div class="example" onclick="quickAsk(\'怎么申请转专业\')">怎么申请转专业</div>' +
+    '<div class="example" onclick="quickAsk(\'有哪些奖学金助学金\')">有哪些奖学金助学金</div>' +
+    '<div class="example" onclick="quickAsk(\'食堂就餐有什么规定\')">食堂就餐有什么规定</div>' +
+    '</div></div>';
+}
+
+function quickAsk(q) {
+  document.getElementById('q').value = q;
+  ask({ preventDefault: function () {} });
+}
+
+async function ask(e) {
+  e.preventDefault();
+  var q = document.getElementById('q').value.trim();
+  if (!q) return false;
+  var btn = document.getElementById('btn'), log = document.getElementById('log');
+  // 移除欢迎区
+  var welcome = document.getElementById('welcome');
+  if (welcome) welcome.remove();
+  btn.disabled = true;
+
+  // 用户气泡
+  var userCard = document.createElement('div');
+  userCard.className = 'bubble user';
+  userCard.textContent = q;
+  log.appendChild(userCard);
+
+  // 助手气泡（loading）
+  var botCard = document.createElement('div');
+  botCard.className = 'bubble bot';
+  botCard.innerHTML = '<div class="loading-steps"></div>';
+  log.appendChild(botCard);
+  var stepsEl = botCard.querySelector('.loading-steps');
+  var timer = loadingSteps(stepsEl, ['检索中…', '重排中…', '生成回答…']);
+
+  document.getElementById('q').value = '';
+  botCard.scrollIntoView({ behavior: 'smooth' });
+
+  try {
+    var r = await fetch('/ask', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: q, topk: 3 })
+    });
+    var d = await r.json();
+    clearInterval(timer);
+
+    // 打字机逐字显示
+    var answerEl = document.createElement('div');
+    botCard.innerHTML = '';
+    botCard.appendChild(answerEl);
+    typewriter(answerEl, d.answer, 25, function () {
+      // 打字机完成后追加来源与置信度
+      var meta = document.createElement('div');
+      meta.style.marginTop = '10px';
+      var conf = d.confidence * 100;
+      var confCls = conf >= 60 ? '' : (conf >= 30 ? ' mid' : ' low');
+      meta.innerHTML = '<span class="badge badge-conf' + confCls + '">置信度 ' + conf.toFixed(0) + '%</span>' +
+        '<span class="muted">' + new Date().toLocaleTimeString() + '</span>';
+      botCard.appendChild(meta);
+
+      if (d.references && d.references.length) {
+        var refs = document.createElement('div');
+        refs.innerHTML = '<div style="font-size:12px; margin-top:10px; color:#9E9E9E;">官方出处：</div>';
+        d.references.forEach(function (ref) {
+          var rc = document.createElement('div');
+          rc.className = 'ref-card';
+          rc.innerHTML = '<div class="ref-title">' + escapeHtml(ref.title) + '</div>' +
+            '<span class="tag">' + escapeHtml(ref.department) + '</span>' +
+            '<span class="tag">' + escapeHtml(ref.column) + '</span>' +
+            ' <span class="muted">匹配分 ' + (ref.score || 0) + '</span>' +
+            ' <a href="' + escapeHtml(ref.source_url) + '" target="_blank">查看原文 →</a>';
+          refs.appendChild(rc);
+        });
+        botCard.appendChild(refs);
+      }
+
+      // 保存历史
+      saveHistory({ q: q, answer: d.answer, confidence: d.confidence, references: d.references, time: Date.now() });
+      botCard.scrollIntoView({ behavior: 'smooth' });
+    });
+  } catch (err) {
+    clearInterval(timer);
+    botCard.innerHTML = '<div class="err">请求失败：' + escapeHtml(err.message) + '（服务没起？）</div>';
+  }
+  btn.disabled = false;
+  return false;
+}
+
+document.getElementById('clearBtn').addEventListener('click', clearHistory);
+
+// URL 参数预填问题（从快速入口跳转）
+var params = new URLSearchParams(location.search);
+if (params.get('q')) {
+  document.getElementById('q').value = params.get('q');
+  ask({ preventDefault: function () {} });
+}
+</script>
+</body>
+</html>

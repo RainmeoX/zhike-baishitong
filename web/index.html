@@ -3,80 +3,225 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>珠科百事通 · 测试台</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: "微软雅黑", "Microsoft YaHei", sans-serif; background: #F5F7FA; color: #212121; min-height: 100vh; display: flex; flex-direction: column; }
-  header { background: #1565C0; color: #fff; padding: 14px 20px; }
-  header h1 { font-size: 18px; font-weight: 600; }
-  header p { font-size: 12px; opacity: .85; margin-top: 2px; }
-  main { flex: 1; max-width: 720px; width: 100%; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 14px; }
-  .qa { background: #fff; border: 1px solid #E0E0E0; border-radius: 10px; padding: 14px 16px; }
-  .q { color: #1565C0; font-weight: 600; font-size: 14px; }
-  .a { margin-top: 8px; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
-  .meta { margin-top: 10px; font-size: 12px; color: #616161; }
-  .conf { display: inline-block; padding: 1px 8px; border-radius: 10px; background: #E8F5E9; color: #2E7D32; margin-right: 8px; }
-  .refs { margin-top: 8px; border-top: 1px dashed #E0E0E0; padding-top: 8px; }
-  .refs a { color: #1565C0; text-decoration: none; font-size: 12px; display: block; margin-bottom: 4px; word-break: break-all; }
-  .refs a:hover { text-decoration: underline; }
-  .routes { font-size: 11px; color: #9E9E9E; }
-  .err { color: #C62828; font-size: 13px; }
-  form { display: flex; gap: 8px; position: sticky; bottom: 0; background: #F5F7FA; padding: 10px 0; }
-  input { flex: 1; padding: 12px 14px; border: 1px solid #E0E0E0; border-radius: 10px; font-size: 14px; outline: none; }
-  input:focus { border-color: #1565C0; }
-  button { padding: 12px 22px; background: #1565C0; color: #fff; border: none; border-radius: 10px; font-size: 14px; cursor: pointer; }
-  button:disabled { background: #90CAF9; cursor: wait; }
-  .hint { font-size: 12px; color: #9E9E9E; text-align: center; }
-  .loading { color: #9E9E9E; font-size: 13px; }
-</style>
+<title>珠科百事通 · 珠海科技学院校务问答</title>
+<link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<header>
-  <h1>珠科百事通 · 测试台</h1>
-  <p>RAGGO!!!!! ｜ 接口：/ask ｜ 每条答案附官方出处</p>
-</header>
-<main id="log">
-  <p class="hint">输入问题开始测试，例如：宿舍空调坏了怎么报修 / 四六级什么时候报名 / 校巴几点发车</p>
-</main>
-<form onsubmit="return ask(event)">
-  <input id="q" placeholder="输入你的问题…" autocomplete="off" required>
-  <button id="btn">提问</button>
-</form>
+<div class="bg"><div class="bg-img"></div><div class="grid-deco"></div></div>
+<button class="sidebar-toggle" aria-label="菜单">≡</button>
+
+<!-- 侧边栏 -->
+<nav class="topnav">
+  <a class="tn-logo" href="index.html">
+    <img class="tn-logo-img" src="/static/img/logo-bai.png" alt="珠海科技学院">
+    <span class="tn-divider"></span>
+    <span class="tn-brand">珠科百事通</span>
+  </a>
+  <div class="tn-links">
+    <a class="item" href="index.html">首页概览</a>
+    <a class="item" href="chat.html">智能问答</a>
+    <a class="item" href="notices.html">通知速览</a>
+    <a class="item" href="about.html">关于项目</a>
+  </div>
+  <a class="tn-git" href="https://gitcode.com/ZSIOM/zhike-baishitong" target="_blank">GitCode</a>
+  <a class="tn-admin" href="/admin">管理后台</a>
+</nav>
+
+<!-- 主内容 -->
+<div class="main">
+  <div class="content">
+
+    <!-- Hero：全屏校园大图 + 红渐变遮罩（珠科官网式恢弘首屏） -->
+    <section class="hero">
+      <div class="hero-photo"></div>
+      <div class="hero-mask"></div>
+      <div class="hero-watermark"><svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 16c0 5 3.4 9 10.6 10.4C11 23.5 7.8 19.9 7 16Z" fill="#fff" opacity=".55"/><path d="M41 16c0 5-3.4 9-10.6 10.4C37 23.5 40.2 19.9 41 16Z" fill="#fff" opacity=".55"/><path d="M15 10c-1.6 6-.4 11 5.6 14.2C15.2 20.4 14.2 15.2 15 10Z" fill="#fff" opacity=".8"/><path d="M33 10c1.6 6 .4 11-5.6 14.2C32.8 20.4 33.8 15.2 33 10Z" fill="#fff" opacity=".8"/><path d="M24 5c-3.6 8-3.6 14 0 20.2C27.6 19 27.6 13 24 5Z" fill="#fff"/><path d="M5 37c5-2.6 33-2.6 38 0v6c-5-2.6-33-2.6-38 0v-6Z" fill="#F6C344"/></svg></div>
+      <div class="hero-inner">
+        <span class="hero-badge">深解珠科 · Learn about us</span>
+        <h2>你好，珠科人</h2>
+        <p class="hero-slogan">珠海科技学院校务问答 · 一句话问，3 秒答，答案带官方出处</p>
+        <div class="hero-motto">
+          <span class="motto-badge">爱国</span>
+          <span class="motto-badge">勤奋</span>
+          <span class="motto-badge">和谐</span>
+          <span class="motto-badge">创新</span>
+        </div>
+        <div class="hero-btns">
+          <a class="btn-hero btn-primary" href="chat.html">开始提问</a>
+          <a class="btn-hero btn-outline-hero" href="notices.html">浏览通知</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 统计条 -->
+    <h3 class="section-title">数据概览</h3>
+    <div class="cards-grid" id="stats">
+      <div class="stat"><div class="num" id="statDocs">-</div><div class="label">收录官方通知</div></div>
+      <div class="stat"><div class="num" id="statDepts">-</div><div class="label">覆盖部门</div></div>
+      <div class="stat"><div class="num">87%</div><div class="label">100问评测 Hit Rate</div></div>
+      <div class="stat"><div class="num" id="statToday">-</div><div class="label">今日问答</div></div>
+    </div>
+
+    <!-- 最新通知时间线 -->
+    <h3 class="section-title">最新通知</h3>
+    <div class="timeline" id="timeline">
+      <div class="empty">加载中…</div>
+    </div>
+
+    <!-- 快速入口：四色区分，图标色与 hover 边色一一对应 -->
+    <h3 class="section-title">快速入口</h3>
+    <div class="cards-grid">
+      <a class="quick-card qc-blue" href="chat.html?q=四六级考试什么时候报名">
+        <div class="qc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#1565C0" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1 2 3 6 3s6-2 6-3v-5"/></svg></div>
+        <div class="qc-title">智能问答</div>
+        <div class="qc-desc">直接问任何校务问题，3 秒带出处回答</div>
+        <div class="qc-link">查看 →</div>
+      </a>
+      <a class="quick-card qc-green" href="chat.html?q=四六级报名">
+        <div class="qc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#2E7D32" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <div class="qc-title">考试信息</div>
+        <div class="qc-desc">四六级、期末考、转专业等考试安排</div>
+        <div class="qc-link">查看 →</div>
+      </a>
+      <a class="quick-card qc-orange" href="notices.html?dept=后勤处">
+        <div class="qc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#E65100" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg></div>
+        <div class="qc-title">后勤服务</div>
+        <div class="qc-desc">报修电话、宿舍、食堂、校巴时刻</div>
+        <div class="qc-link">查看 →</div>
+      </a>
+      <a class="quick-card qc-purple" href="notices.html?dept=招生办">
+        <div class="qc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#6A1B9A" stroke-width="2"><path d="M20 7h-9M14 17H5M17 3l3 3-3 3M7 21l-3-3 3-3"/></svg></div>
+        <div class="qc-title">招生政策</div>
+        <div class="qc-desc">招生计划、录取规则、奖助学金</div>
+        <div class="qc-link">查看 →</div>
+      </a>
+    </div>
+
+    <!-- 大家都在问（热门问题，数据来自真实问答埋点） -->
+    <h3 class="section-title">大家都在问</h3>
+    <div class="hot-list" id="hotList">
+      <span class="empty">加载中…</span>
+    </div>
+
+    <!-- 底部项目简介 -->
+    <h3 class="section-title">关于珠科百事通</h3>
+    <div class="card">
+      <div class="about-stats">
+        <div class="about-stat"><div class="num">2421<span class="unit">亩</span></div><div class="label">校园面积</div></div>
+        <div class="about-stat"><div class="num">3.1<span class="unit">万余名</span></div><div class="label">在校生</div></div>
+        <div class="about-stat"><div class="num">18<span class="unit">个</span></div><div class="label">二级学院</div></div>
+        <div class="about-stat"><div class="num">全国第二</div><div class="label">软科民办高校排名</div></div>
+      </div>
+      <p style="font-size:14px; line-height:1.8; color:#424242;">
+        「珠科百事通」是面向珠海科技学院 3.1 万在校生的校务生活 RAG 智能问答平台。
+        采集教务处、后勤处、招生办、图书馆 254 篇真实官方通知，经清洗入库后，
+        通过 FTS5 关键词检索与 bge-m3 语义向量检索双路召回、RRF 融合、bge-reranker 精排、
+        时效降权，最终由大模型生成带官方出处的回答。
+      </p>
+      <p style="font-size:13px; color:#9E9E9E; margin-top:10px;">
+        技术栈：Python / FastAPI / SQLite FTS5 / bge-m3 / bge-reranker / 华为云 MaaS LLM
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
 <script>
-async function ask(e) {
-  e.preventDefault();
-  const q = document.getElementById('q').value.trim();
-  if (!q) return false;
-  const btn = document.getElementById('btn'), log = document.getElementById('log');
-  btn.disabled = true;
-  const card = document.createElement('div');
-  card.className = 'qa';
-  card.innerHTML = '<div class="q">Q：' + q.replace(/</g,'&lt;') + '</div><div class="loading">检索中（关键词+语义双路 → 重排 → 生成）…</div>';
-  log.appendChild(card);
-  document.getElementById('q').value = '';
-  card.scrollIntoView({ behavior: 'smooth' });
-  try {
-    const r = await fetch('/ask', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: q, topk: 3 })
-    });
-    const d = await r.json();
-    let html = '<div class="a">' + d.answer.replace(/</g, '&lt;') + '</div>';
-    html += '<div class="meta"><span class="conf">置信度 ' + (d.confidence * 100).toFixed(0) + '%</span>' + new Date().toLocaleTimeString() + '</div>';
-    if (d.references && d.references.length) {
-      html += '<div class="refs"><b style="font-size:12px">官方出处：</b>';
-      for (const ref of d.references)
-        html += '<a href="' + ref.source_url + '" target="_blank">📄 ' + ref.title + '（' + ref.department + '）</a>';
-      html += '</div>';
-    }
-    card.innerHTML = '<div class="q">Q：' + q.replace(/</g,'&lt;') + '</div>' + html;
-  } catch (err) {
-    card.innerHTML = '<div class="q">Q：' + q.replace(/</g,'&lt;') + '</div><div class="err">请求失败：' + err.message + '（服务没起？先跑 python start.py）</div>';
+// 数字滚动动画：从 0 滚到目标值，显眼
+function countUp(el, target, suffix) {
+  var start = null, dur = 900;
+  function step(ts) {
+    if (!start) start = ts;
+    var p = Math.min((ts - start) / dur, 1);
+    var eased = 1 - Math.pow(1 - p, 3); // ease-out cubic
+    el.textContent = Math.round(target * eased) + (suffix || '');
+    if (p < 1) requestAnimationFrame(step);
   }
-  btn.disabled = false;
-  card.scrollIntoView({ behavior: 'smooth' });
-  return false;
+  requestAnimationFrame(step);
 }
+
+// 加载统计
+async function loadStats() {
+  try {
+    var d = await apiGet('/api/stats/public');
+    countUp(document.getElementById('statDocs'), d.documents_total);
+    countUp(document.getElementById('statDepts'), (d.departments || []).length);
+    countUp(document.getElementById('statToday'), d.queries_today);
+  } catch (e) {}
+}
+
+// 加载最新通知时间线
+async function loadTimeline() {
+  try {
+    var d = await apiGet('/api/notices?size=8');
+    var box = document.getElementById('timeline');
+    if (!d.items.length) { box.innerHTML = '<div class="empty">暂无通知</div>'; return; }
+    box.innerHTML = d.items.map(function (it, i) {
+      var st = noticeStatus(it.publish_time, it.title);
+      return '<div class="timeline-item reveal" data-id="' + escapeHtml(it.doc_id) + '">' +
+        '<div class="tl-date">' + formatDate(it.publish_time) + '</div>' +
+        '<div class="tl-title">' + escapeHtml(it.title) +
+          '<span class="st-tag ' + st.cls + '">' + st.label + '</span></div>' +
+        '<span class="tag">' + escapeHtml(it.department) + '</span>' +
+        '<div class="tl-summary">加载中…</div>' +
+      '</div>';
+    }).join('');
+    // 点击展开摘要
+    box.querySelectorAll('.timeline-item').forEach(function (el) {
+      el.addEventListener('click', function () {
+        if (el.classList.contains('expanded')) { el.classList.remove('expanded'); return; }
+        el.classList.add('expanded');
+        var sum = el.querySelector('.tl-summary');
+        if (sum.dataset.loaded) return;
+        apiGet('/api/notices/' + encodeURIComponent(el.dataset.id)).then(function (doc) {
+          var c = (doc.content || '').slice(0, 200);
+          sum.textContent = c + (doc.content && doc.content.length > 200 ? '…' : '');
+          sum.dataset.loaded = '1';
+        }).catch(function () { sum.textContent = '加载失败'; });
+      });
+    });
+    // 触发 reveal 观察新元素（rootMargin 提前 300px 触发；另加 3s 兜底强制显示，
+    // 防止快速滚动或 observer 异常导致时间线长期空白）
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) { entry.target.classList.add('in'); io.unobserve(entry.target); }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px 300px 0px' });
+      box.querySelectorAll('.reveal').forEach(function (el, i) {
+        el.style.animationDelay = (i * 60) + 'ms';
+        io.observe(el);
+      });
+      setTimeout(function () {
+        box.querySelectorAll('.reveal:not(.in)').forEach(function (el) { el.classList.add('in'); });
+      }, 3000);
+    } else {
+      box.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('in'); });
+    }
+  } catch (e) {
+    document.getElementById('timeline').innerHTML = '<div class="empty">加载失败</div>';
+  }
+}
+
+loadStats();
+loadTimeline();
+
+// 加载热门问题（大家都在问）
+async function loadHot() {
+  try {
+    var d = await apiGet('/api/stats/hot?limit=6');
+    var box = document.getElementById('hotList');
+    if (!d.items.length) { box.innerHTML = '<span class="empty">暂无数据</span>'; return; }
+    box.innerHTML = d.items.map(function (it) {
+      return '<a class="hot-item" href="chat.html?q=' + encodeURIComponent(it.question) + '">' +
+        escapeHtml(it.question) + ' <b style="color:#9e9e9e;font-weight:400;">' + it.cnt + '</b></a>';
+    }).join('');
+  } catch (e) {
+    document.getElementById('hotList').innerHTML = '<span class="empty">暂无数据</span>';
+  }
+}
+loadHot();
 </script>
 </body>
 </html>
