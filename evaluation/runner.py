@@ -170,7 +170,65 @@ def _citation_check(answer, expected, title_content):
     return total, ok
 
 
-def run_eval(api_url, csv_path, recall_k=5):
+def _ask_one(row, api_url, recall_k, title_content):
+    """单题处理：请求 /ask + 判定，返回明细 dict（不累加指标，供主线程收集后统一算）。"""
+    qid = row.get("id", row.get("ID", ""))
+    q = row.get("问题", row.get("question", ""))
+    expected = row.get("期望答案要点", row.get("expected", ""))
+    category = row.get("类别", row.get("category", ""))
+    try:
+        resp = requests.post(f"{api_url}/ask", json={"question": q, "topk": 5}, timeout=60)
+    except Exception as e:
+        return {"id": qid, "question": q, "hit": False, "mrr": 0.0, "recall_at_k": 0.0,
+                "reason": f"请求失败 {e}"}
+    if resp.status_code != 200:
+        return {"id": qid, "question": q, "hit": False, "mrr": 0.0, "recall_at_k": 0.0,
+                "reason": f"HTTP {resp.status_code}"}
+    data = resp.json()
+    refs = data.get("references", [])
+    answer = data.get("answer", "")
+
+    # 拒答题（期望要点为空）：答案含拒答标记即算拒答成功
+    if not expected:
+        refused = _is_refusal(answer)
+        return {"id": qid, "question": q, "category": category, "expected": expected,
+                "type": "refusal", "hit": refused, "hit_rank": 0, "mrr": 0.0,
+                "recall_at_k": 0.0, "confidence": data.get("confidence", 0),
+                "top_title": refs[0]["title"] if refs else "",
+                "cite_ok": 0, "cite_total": 0, "refusal_ok": refused}
+
+    # 普通题：逐引用判定命中位置（MRR）
+    first_hit_rank = 0
+    for rank, r in enumerate(refs, 1):
+        if _matched_points(expected, _ref_text(r)):
+            first_hit_rank = rank
+            break
+    hit = first_hit_rank > 0
+    rr = 1.0 / first_hit_rank if hit else 0.0
+    points = [k.strip() for k in expected.split("、") if k.strip()] if expected else []
+    if points:
+        all_ref_text = " ".join(_ref_text(r) for r in refs[:recall_k])
+        recall = len(_matched_points(expected, all_ref_text)) / len(points)
+    else:
+        recall = 0.0
+    cite = _citation_check(answer, expected, title_content)
+    return {"id": qid, "question": q, "category": category, "expected": expected,
+            "type": "normal", "hit": hit, "hit_rank": first_hit_rank, "mrr": round(rr, 4),
+            "recall_at_k": round(recall, 4), "confidence": data.get("confidence", 0),
+            "top_title": refs[0]["title"] if refs else "",
+            "cite_ok": cite[1] if cite is not None else 0,
+            "cite_total": cite[0] if cite is not None else 0}
+
+
+def run_eval(api_url, csv_path, recall_k=5, workers=8):
+    """并发评测：worker 线程并发请求 /ask，主线程收集后统一累加指标。
+
+    串行版每问阻塞在 embed+rerank+LLM 三次网络往返（5-10s），100 问串行需 13-16 分钟；
+    并发 8 路后压到 ~2 分钟。FastAPI 同步路由丢 anyio 线程池（默认 40），并发请求可被
+    服务端并发处理（网络 IO 阻塞不抢 GIL）。指标算法零改动，明细按 id 排序还原。
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     with open(csv_path, encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
 
@@ -180,6 +238,23 @@ def run_eval(api_url, csv_path, recall_k=5):
         print("⚠️  未找到爬取数据（data/zcst.db），本轮跳过引用正确性抽检")
 
     total = len(rows)
+    details = [None] * total
+    done = 0
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {ex.submit(_ask_one, row, api_url, recall_k, title_content): i
+                for i, row in enumerate(rows)}
+        for fut in as_completed(futs):
+            i = futs[fut]
+            try:
+                details[i] = fut.result()
+            except Exception as e:
+                details[i] = {"id": rows[i].get("id", ""), "question": rows[i].get("问题", ""),
+                              "hit": False, "mrr": 0.0, "recall_at_k": 0.0, "reason": f"异常 {e}"}
+            done += 1
+            if done % 10 == 0:
+                print(f"  进度 {done}/{total}…")
+
+    # 收集完毕，统一累加指标（拒答题不计 Hit Rate/MRR/Recall 分母）
     hits = 0
     mrr_sum = 0.0
     recall_sum = 0.0
@@ -187,107 +262,18 @@ def run_eval(api_url, csv_path, recall_k=5):
     cite_ok = 0
     refusal_total = 0
     refusal_ok = 0
-    details = []
-
-    for row in rows:
-        qid = row.get("id", row.get("ID", ""))
-        q = row.get("问题", row.get("question", ""))
-        expected = row.get("期望答案要点", row.get("expected", ""))
-        category = row.get("类别", row.get("category", ""))
-
-        try:
-            resp = requests.post(
-                f"{api_url}/ask",
-                json={"question": q, "topk": 5},
-                timeout=60,
-            )
-        except Exception as e:
-            # 连接失败等异常：单题跳过，不中断整场评测
-            details.append({"id": qid, "question": q, "hit": False,
-                            "mrr": 0.0, "recall_at_k": 0.0,
-                            "reason": f"请求失败 {e}"})
-            print(f"[跳过] {qid}: 请求失败 {e}")
-            continue
-        if resp.status_code != 200:
-            details.append({"id": qid, "question": q, "hit": False,
-                            "mrr": 0.0, "recall_at_k": 0.0,
-                            "reason": f"HTTP {resp.status_code}"})
-            continue
-
-        data = resp.json()
-        refs = data.get("references", [])
-        answer = data.get("answer", "")
-
-        # ── 拒答题（期望要点为空）：答案含拒答标记即算拒答成功 ──
-        # 库内无相关信息时正确拒答而非编造；不计入 Hit Rate 分母，单独统计
-        if not expected:
+    for d in details:
+        if d.get("type") == "refusal":
             refusal_total += 1
-            refused = _is_refusal(answer)
-            if refused:
+            if d.get("refusal_ok"):
                 refusal_ok += 1
-            details.append({
-                "id": qid,
-                "question": q,
-                "category": category,
-                "expected": expected,
-                "type": "refusal",
-                "hit": refused,
-                "hit_rank": 0,
-                "mrr": 0.0,
-                "recall_at_k": 0.0,
-                "confidence": data.get("confidence", 0),
-                "top_title": refs[0]["title"] if refs else "",
-                "cite_ok": 0,
-                "cite_total": 0,
-                "refusal_ok": refused,
-            })
-            continue
-
-        # ── 逐引用判定命中位置（MRR）──
-        points = [k.strip() for k in expected.split("、") if k.strip()] if expected else []
-        first_hit_rank = 0  # 1-based，0 = 未命中
-        for rank, r in enumerate(refs, 1):
-            if _matched_points(expected, _ref_text(r)):
-                first_hit_rank = rank
-                break
-
-        hit = first_hit_rank > 0
-        rr = 1.0 / first_hit_rank if hit else 0.0
-
-        # ── Recall@K：top-K 引用覆盖的期望要点比例 ──
-        if points:
-            all_ref_text = " ".join(_ref_text(r) for r in refs[:recall_k])
-            matched = len(_matched_points(expected, all_ref_text))
-            recall = matched / len(points)
         else:
-            recall = 0.0
-
-        # ── 引用正确性抽检：被引文档正文是否含期望要点 ──
-        cite = _citation_check(answer, expected, title_content)
-        if cite is not None:
-            cite_total += cite[0]
-            cite_ok += cite[1]
-
-        if hit:
-            hits += 1
-        mrr_sum += rr
-        recall_sum += recall
-
-        details.append({
-            "id": qid,
-            "question": q,
-            "category": category,
-            "expected": expected,
-            "type": "normal",
-            "hit": hit,
-            "hit_rank": first_hit_rank,
-            "mrr": round(rr, 4),
-            "recall_at_k": round(recall, 4),
-            "confidence": data.get("confidence", 0),
-            "top_title": refs[0]["title"] if refs else "",
-            "cite_ok": cite[1] if cite is not None else 0,
-            "cite_total": cite[0] if cite is not None else 0,
-        })
+            if d.get("hit"):
+                hits += 1
+            mrr_sum += d.get("mrr", 0.0)
+            recall_sum += d.get("recall_at_k", 0.0)
+            cite_total += d.get("cite_total", 0)
+            cite_ok += d.get("cite_ok", 0)
 
     # 指标分母只算可答题（普通+陷阱）；拒答题单独统计拒答成功率
     answerable = total - refusal_total
@@ -393,9 +379,10 @@ def main():
     parser.add_argument("--csv", default="evaluation/questions.csv", help="评测集 CSV")
     parser.add_argument("--save", action="store_true", help="结果落盘到 evaluation/results/")
     parser.add_argument("--recall-k", type=int, default=5, help="Recall@K 的 K 值（默认 5）")
+    parser.add_argument("--workers", type=int, default=8, help="并发请求数（默认 8）")
     args = parser.parse_args()
 
-    rate, mrr, recall_at_k, cite_prec, refusal_rate, details = run_eval(args.api, args.csv, recall_k=args.recall_k)
+    rate, mrr, recall_at_k, cite_prec, refusal_rate, details = run_eval(args.api, args.csv, recall_k=args.recall_k, workers=args.workers)
     if rate < 85:
         print(f"\n⚠️  当前 Hit Rate {rate:.1f}% < 85% 目标，需优化检索或补充数据")
     else:
