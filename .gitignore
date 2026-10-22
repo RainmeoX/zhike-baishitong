@@ -9,6 +9,9 @@ data/
 *.db
 *.sqlite
 
+# 评测结果产物
+evaluation/results/
+
 # IDE / 系统
 .vscode/
 *.code-workspace
@@ -18,9 +21,13 @@ Thumbs.db
 # 密钥与本地配置
 .env
 config.local.*
+opencode.json
 
 # 微信开发者工具个人私有配置
 project.private.config.json
 
 # 智能体会话目录（不入库）
 .codeartsdoer/
+
+# 打包产物（不入库）
+submission/output/

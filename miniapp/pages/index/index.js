@@ -24,6 +24,10 @@ Page({
     this.setData({ inputValue: e.detail.value })
   },
 
+  onClearInput() {
+    this.setData({ inputValue: '' })
+  },
+
   onSearch() {
     const q = this.data.inputValue.trim()
     if (!q) return

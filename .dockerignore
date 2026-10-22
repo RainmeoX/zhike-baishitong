@@ -1,0 +1,21 @@
+# 不入镜像的文件
+data/
+.env
+.git/
+.github/
+.pytest_cache/
+.codeartsdoer/
+.opencode/
+__pycache__/
+*.pyc
+tests/
+docs/
+specs/
+submission/
+readme/
+日志/
+miniapp/
+*.md
+.gitignore
+.dockerignore
+Dockerfile

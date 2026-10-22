@@ -6,6 +6,7 @@ Page({
     question: '',
     answer: '',
     confidence: 0,
+    confidencePercent: 0,
     references: [],
     loading: true,
     error: ''
@@ -30,6 +31,7 @@ Page({
           this.setData({
             answer: res.data.answer || '',
             confidence: res.data.confidence || 0,
+            confidencePercent: Math.round((res.data.confidence || 0) * 100),
             references: res.data.references || []
           })
         } else {

@@ -40,6 +40,10 @@ SITES = {
         "name": "招生办",
         "base_url": "https://zsb.zcst.edu.cn",
         "department": "招生办",
+        "columns": [
+            {"name": "招生信息", "list_path": "/4470/list.htm"},
+            {"name": "了解珠科视频", "list_path": "/ljzkwspw/list.htm"},
+        ],
         "pages": [
             {"name": "奖学金、助学金", "url": "/2021/0617/c4655a161739/page.htm"},
             {"name": "转专业政策", "url": "/2021/0617/c4655a161740/page.htm"},

@@ -21,7 +21,7 @@
         <view class="confidence-bar">
           <view class="confidence-fill" style="width: {{confidence * 100}}%" />
         </view>
-        <view class="confidence-text">置信度 {{Math.round(confidence * 100)}}%</view>
+        <view class="confidence-text">置信度 {{confidencePercent}}%</view>
       </view>
       <view class="answer-text">{{answer}}</view>
     </view>

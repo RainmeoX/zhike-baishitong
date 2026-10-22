@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """项目 .env 加载器：把项目根目录 .env 的键值注入 os.environ（不覆盖已有）。
 
-所有依赖 HWMAAS_* / GITCODE_TOKEN 环境变量的模块在读取环境前 import 本模块调用 load()。
+所有依赖 HWMAAS_* / LLM_* / JINA_* 环境变量的模块在读取环境前 import 本模块调用 load()。
 """
 import os
 from pathlib import Path

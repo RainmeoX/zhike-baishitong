@@ -42,7 +42,8 @@ class TestSearch:
     def test_baishi_query(self):
         results = search("报修电话", topk=5)
         assert len(results) > 0
-        assert "报修" in results[0]["title"]
+        # 同义词扩充后"报修电话"也匹配"服务电话"等
+        assert "报修" in results[0]["title"] or "服务电话" in results[0]["title"]
 
     def test_bus_query(self):
         results = search("校园巴士", topk=5)
