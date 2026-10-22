@@ -28,6 +28,7 @@ project.private.config.json
 
 # 智能体会话目录（不入库）
 .codeartsdoer/
+.workbuddy/
 
 # 打包产物（不入库）
 submission/output/
