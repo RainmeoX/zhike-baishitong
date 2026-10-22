@@ -39,13 +39,14 @@ class TestHtmlToText:
 
 
 class TestSitesConfig:
-    def test_three_sites(self):
-        assert len(SITES) == 3
+    def test_site_count(self):
+        assert len(SITES) == 4
 
     def test_site_keys(self):
         assert "jiaowu" in SITES
         assert "houqin" in SITES
         assert "zsb" in SITES
+        assert "library" in SITES
 
     def test_site_fields(self):
         for key, site in SITES.items():

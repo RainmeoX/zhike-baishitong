@@ -50,4 +50,19 @@ SITES = {
             {"name": "招生章程", "url": "/2021/0619/c4655a161844/page.htm"},
         ],
     },
+    "library": {
+        "name": "图书馆",
+        "base_url": "http://library.zcst.edu.cn",
+        "department": "图书馆",
+        "columns": [
+            {"name": "通知公告", "list_path": "/tzgg/list.htm"},
+            {"name": "规章制度", "list_path": "/gzzd/list.htm"},
+        ],
+        "pages": [
+            {"name": "开馆时间", "url": "/kgsj/list.htm"},
+            {"name": "常见问题", "url": "/cjwt/list.htm"},
+            {"name": "图书续借", "url": "/yyfw/list.htm"},
+            {"name": "管理办法", "url": "/glbf/list.htm"},
+        ],
+    },
 }
